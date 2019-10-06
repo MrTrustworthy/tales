@@ -1,9 +1,11 @@
 import pyglet
 
 from tales.components import Drawable, Position, Collider, Movement
+from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems import UnitDrawingSystem, MovementSystem, CollisionSystem
 from tales.systems.system import SystemType
+from tales.systems.worldmap import MapDrawingSystem
 from tales.world import World
 
 
@@ -12,12 +14,14 @@ def make_players():
         Drawable("player"),
         Position(50, 50),
         Collider(32),
-        Movement(450, 450, 100)
+        Movement(950, 800, 100)
     ]), Entity([
         Drawable("player"),
-        Position(450, 50),
+        Position(950, 50),
         Collider(32),
-        Movement(50, 450, 100)
+        Movement(50, 800, 100)
+    ]), Entity([
+        WorldMap("test")
     ])]
 
 
@@ -29,9 +33,10 @@ def make_world():
 
 def make_systems(world):
     systems = [
+        MapDrawingSystem(world),
         UnitDrawingSystem(world, show_hitbox_circles=True),
         MovementSystem(world),
-        CollisionSystem(world)
+        CollisionSystem(world),
     ]
     return systems
 
@@ -39,7 +44,7 @@ def make_systems(world):
 class Game:
 
     def __init__(self):
-        self.window_size = [1024, 768]
+        self.window_size = [1920, 1080]
         self.fps = 60
         self.window = pyglet.window.Window(width=self.window_size[0], height=self.window_size[1], caption="Tales")
 
