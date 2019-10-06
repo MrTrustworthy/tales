@@ -1,5 +1,5 @@
 from tales.components.component import Component
-from pygame import Vector2
+from tales.utils.math import Vector2
 
 
 class Position(Component):
