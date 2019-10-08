@@ -11,9 +11,10 @@ from tales.components import Component
 @dataclass
 class Adjacency:
     adjacent_points: Dict[Any, Any]
-    adjacent_vertices: Dict[Any, Any]
+    adjacent_vertices: Dict[Any, Any]  # adj_vxs
     region_idx_to_point_idx: Dict[Any, Any]  # vx_regions
     adjacency_map: Dict[Any, Any]
+    vertex_is_edge: Dict[int, bool]  # self.edge
 
 
 class WorldMap(Component):
@@ -54,6 +55,7 @@ class Mesh:
         # adjacencies give us maps that we can use to quickly look up nodes that belong together
         self.v_adjacencies = self._build_adjacencies()
         self.remove_outliers()
+        self.v_adjacencies.vertex_is_edge = self.calculate_edges()
 
         # pdb.set_trace()
 
@@ -115,7 +117,8 @@ class Mesh:
             adjacent_points,
             adjacent_vertices,
             region_idx_to_point_idx,
-            adjacency_map
+            adjacency_map,
+            None  # can we set a default in the dataclass? this is overwritten later
         )
 
     def remove_outliers(self):
@@ -124,3 +127,12 @@ class Mesh:
         for vertex_idx in range(self.v_number_vertices):
             point = self.points[self.v_adjacencies.region_idx_to_point_idx[vertex_idx]]
             self.v_vertices[vertex_idx, :] = np.mean(point, 0)
+
+    def calculate_edges(self):
+        n = self.v_number_vertices
+        edges = np.zeros(n, np.bool)
+        for vertex_idx in range(n):
+            adjs = self.v_adjacencies.adjacent_vertices[vertex_idx]
+            if -1 in adjs:
+                edges[vertex_idx] = True
+        return edges
