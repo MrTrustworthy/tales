@@ -1,37 +1,71 @@
-from random import randint
-from typing import List
+from collections import namedtuple, defaultdict
+import random
+from dataclasses import dataclass
+from typing import List, Tuple, Any, Dict
 
 from tales.components import Component
 import numpy as np
 from scipy import spatial
 
 
+@dataclass
+class Adjacency:
+    adjacent_points: Dict[Any, Any]
+    adjacent_vertices: Dict[Any, Any]
+    region_idx_to_point_idx: Dict[Any, Any]
+    region_idx_to_point_idx_all: Dict[Any, Any]
+    adjacency_map: Dict[Any, Any]
+
+
 class WorldMap(Component):
-    def __init__(self, mode="test", num_nodes=1024):
+    def __init__(self, mode="test", num_nodes=128):
         self.num_nodes = num_nodes
+        self.mesh = Mesh(number_points=num_nodes)
 
-        points = WorldMap.build_grid(self.num_nodes)
-        self._vor = spatial.Voronoi(points)
 
-        # self._regions = [self.vor.regions[i] for i in self.vor.point_region]
-        # self._vor_vertices = self.vor.vertices
-        # self._num_vor_vertices = self.vor_vertices.shape[0]
+class Mesh:
+    def __init__(self, number_points: int = 16, seed: int = 5):
+        self.number_points = number_points
+        self.seed = seed
 
-        # self.build_adjs()
-        # self.improve_vxs()
-        # self.calc_edges()
-        # self.distort_vxs()
-        # self.elevation = np.zeros(self.nvxs + 1)
-        # self.erodability = np.ones(self.nvxs)
+        self.points = self._generate_good_points()
 
-        self.tiles = Tile.from_voronoi(self._vor)
-        self.center_points = np.array([t.center for t in self.tiles]).flatten()
-        self.edge_points = np.concatenate([t.vertices.flatten() for t in self.tiles])
+        # points
+        #       Coordinates of input points.
+        # vertices
+        #       Coordinates of the Voronoi vertices.
+        # ridge_points
+        #       Indices of the points between which each Voronoi ridge lies.
+        # ridge_vertices
+        #       Indices of the Voronoi vertices forming each Voronoi ridge.
+        # regions
+        #       Indices of the Voronoi vertices forming each Voronoi region.
+        #       -1 indicates vertex outside the Voronoi diagram.
+        # point_region
+        #       Index of the Voronoi region for each input point.
+        #       If qhull option “Qc” was not specified, the list will contain -1 for points
+        #       that are not associated with a Voronoi region.
+        self.vor = spatial.Voronoi(self.points)
 
-    @staticmethod
-    def build_grid(num_nodes, iterations=2):
-        points = np.random.random((num_nodes, 2))
-        # smoothing of points
+        # v_regions map the index of a point in self.points to a region
+        self.v_regions = [self.vor.regions[idx] for idx in self.vor.point_region]
+        self.v_vertices = self.vor.vertices
+        self.v_number_vertices = self.v_vertices.shape[0]
+
+        # adjacencies give us maps that we can use to quickly look up nodes that belong together
+        self.v_adjacencies = self.build_adjacencies()
+
+        import pdb;
+        # pdb.set_trace()
+
+    def _generate_good_points(self) -> np.ndarray:
+        np.random.seed(self.seed)
+        points = np.random.random((self.number_points, 2))
+        good_points = self._improve_points(points)
+        # TODO reduce points to the extent
+        return good_points
+
+    def _improve_points(self, points: np.ndarray, iterations=2) -> np.ndarray:
         for _ in range(iterations):
             vor = spatial.Voronoi(points)
             newpts = []
@@ -49,30 +83,41 @@ class WorldMap(Component):
             points = np.asarray(newpts)
         return points
 
+    def build_adjacencies(self) -> Adjacency:
 
-class Tile:
+        adjacent_points = defaultdict(list)
+        adjacent_vertices = defaultdict(list)
+        region_idx_to_point_idx = defaultdict(list)
+        region_idx_to_point_idx_all = defaultdict(list)
+        adjacency_map = np.zeros((self.v_number_vertices, 3), np.int32) - 1
 
-    @classmethod
-    def from_voronoi(cls, voronoi) -> List["Tile"]:
-        tiles = []
-        for center, point_region_idx in zip(voronoi.points, voronoi.point_region):
-            # take the center point and all the vertices that define that points' "region"
-            region = voronoi.regions[point_region_idx]
-            verts = [voronoi.vertices[region_vertex_idx] for region_vertex_idx in region if region_vertex_idx != -1]
-            vertices = np.array(verts)
-            tile = cls(center, vertices)
-            tiles.append(tile)
-        return tiles
+        # find all points that are neighbouring a different point
+        for p1, p2 in self.vor.ridge_points:
+            adjacent_points[p1].append(p2)
+            adjacent_points[p2].append(p1)
 
-    def __init__(self, center, vertices):
-        self.center = center
-        self.vertices = vertices
-        self.drawable_polygon = np.concatenate([self.center, self.vertices.flatten(), self.vertices.flatten()[:2]])
-        self.drawable_poly_length = len(self.drawable_polygon) // 2
-        self.drawable_poly_color = (randint(0, 255), randint(0, 255), randint(0, 255)) * self.drawable_poly_length
+        # find all ridge vertices that are neighbouring a different ridge vertice
+        for v1, v2 in self.vor.ridge_vertices:
+            adjacent_vertices[v1].append(v2)
+            adjacent_vertices[v2].append(v1)
 
-    def __repr__(self):
-        return f'C: {self.center} [{self.vertices}]'
+        for k, v in adjacent_vertices.items():
+            if k != -1:
+                adjacency_map[k, :] = v
 
-    def __hash__(self):
-        return hash(str(self.center))
+        # build a region-point-index to point-index map
+        for point_idx in range(self.number_points):
+            region = self.v_regions[point_idx]
+            for region_point_idx in region:
+                region_idx_to_point_idx_all[region_point_idx].append(point_idx)
+                if region_point_idx == -1:
+                    continue
+                region_idx_to_point_idx[region_point_idx].append(point_idx)
+
+        return Adjacency(
+            adjacent_points,
+            adjacent_vertices,
+            region_idx_to_point_idx,
+            region_idx_to_point_idx_all,
+            adjacency_map
+        )

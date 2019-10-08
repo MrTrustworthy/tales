@@ -1,3 +1,6 @@
+from random import randint, seed
+
+import numpy as np
 import pyglet
 
 from tales.components.worldmap import WorldMap
@@ -19,42 +22,19 @@ class MapDrawingSystem(System):
 
     def update(self, entity: Entity, *args, **kwargs):
         map = entity.get_component_by_class(WorldMap)
+        vor = map.mesh.vor
 
-        for tile in map.tiles:
+        for center, point_region_idx in zip(vor.points, vor.point_region):
+            # take the center point and all the vertices that define that points' "region"
+            region = vor.regions[point_region_idx]
+            verts = np.array([vor.vertices[region_vertex_idx] for region_vertex_idx in region if region_vertex_idx != -1])
+            drawable_poly = np.concatenate([center, verts.flatten(), verts.flatten()[:2]])
+            amount = len(drawable_poly)//2
+
+            seed(center[0] ** center[1])
             pyglet.graphics.vertex_list(
-                tile.drawable_poly_length,
-                ('v2f/static', tile.drawable_polygon * self.draw_scale + 100),
-                ('c3B', tile.drawable_poly_color)
+                amount,
+                ('v2f/static', drawable_poly * self.draw_scale + 100),
+                ('c3B', (randint(0, 255), randint(0, 255), randint(0, 255)) * amount)
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
 
-        # batches should be faster, this doesn't work yet
-        # batch = pyglet.graphics.Batch()
-        # for tile in map.tiles:
-        #     batch.add(
-        #         tile.drawable_poly_length,
-        #         pyglet.gl.GL_TRIANGLE_FAN,
-        #         None,
-        #         ('v2f/static', tile.drawable_polygon * self.draw_scale + 100),
-        #         ('c3B', tile.drawable_poly_color)
-        #     )
-        # batch.draw()
-
-        if self.centers:
-            draw_points = map.center_points * self.draw_scale + 100
-            point_amount = len(draw_points) // 2
-            pyglet.graphics.draw(
-                point_amount,
-                pyglet.gl.GL_POINTS,
-                ('v2f', draw_points),
-                ('c3B', (255, 255, 255) * point_amount)
-            )
-
-        if self.edges:
-            vor_edges = map.edge_points * self.draw_scale + 100
-            edge_amount = len(vor_edges) // 2
-            pyglet.graphics.draw(
-                edge_amount,
-                pyglet.gl.GL_POINTS,
-                ('v2f', vor_edges),
-                ('c3B', (0, 0, 255) * edge_amount)
-            )
