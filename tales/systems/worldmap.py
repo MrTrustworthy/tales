@@ -32,6 +32,7 @@ class MapDrawingSystem(System):
             amount = len(drawable_poly)//2
 
             seed(center[0] ** center[1])
+
             pyglet.graphics.vertex_list(
                 amount,
                 ('v2f/static', drawable_poly * self.draw_scale + 100),

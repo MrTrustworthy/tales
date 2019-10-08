@@ -1,11 +1,11 @@
-from collections import namedtuple, defaultdict
-import random
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Tuple, Any, Dict
+from typing import Any, Dict
 
-from tales.components import Component
 import numpy as np
 from scipy import spatial
+
+from tales.components import Component
 
 
 @dataclass
@@ -17,9 +17,9 @@ class Adjacency:
 
 
 class WorldMap(Component):
-    def __init__(self, mode="test", num_nodes=128):
+    def __init__(self, num_nodes: int = 1024, seed: int = 5):
         self.num_nodes = num_nodes
-        self.mesh = Mesh(number_points=num_nodes)
+        self.mesh = Mesh(number_points=num_nodes, seed=seed)
 
 
 class Mesh:
@@ -55,7 +55,6 @@ class Mesh:
         self.v_adjacencies = self._build_adjacencies()
         self.remove_outliers()
 
-        import pdb;
         # pdb.set_trace()
 
     def _generate_good_points(self) -> np.ndarray:

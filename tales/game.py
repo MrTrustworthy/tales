@@ -21,7 +21,7 @@ def make_players():
         Collider(32),
         Movement(50, 800, 100)
     ]), Entity([
-        WorldMap("test")
+        WorldMap()
     ])]
 
 
