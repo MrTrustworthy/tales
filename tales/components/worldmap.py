@@ -12,8 +12,7 @@ from scipy import spatial
 class Adjacency:
     adjacent_points: Dict[Any, Any]
     adjacent_vertices: Dict[Any, Any]
-    region_idx_to_point_idx: Dict[Any, Any]
-    region_idx_to_point_idx_all: Dict[Any, Any]
+    region_idx_to_point_idx: Dict[Any, Any]  # vx_regions
     adjacency_map: Dict[Any, Any]
 
 
@@ -53,7 +52,8 @@ class Mesh:
         self.v_number_vertices = self.v_vertices.shape[0]
 
         # adjacencies give us maps that we can use to quickly look up nodes that belong together
-        self.v_adjacencies = self.build_adjacencies()
+        self.v_adjacencies = self._build_adjacencies()
+        self.remove_outliers()
 
         import pdb;
         # pdb.set_trace()
@@ -83,12 +83,11 @@ class Mesh:
             points = np.asarray(newpts)
         return points
 
-    def build_adjacencies(self) -> Adjacency:
+    def _build_adjacencies(self) -> Adjacency:
 
         adjacent_points = defaultdict(list)
         adjacent_vertices = defaultdict(list)
         region_idx_to_point_idx = defaultdict(list)
-        region_idx_to_point_idx_all = defaultdict(list)
         adjacency_map = np.zeros((self.v_number_vertices, 3), np.int32) - 1
 
         # find all points that are neighbouring a different point
@@ -109,7 +108,6 @@ class Mesh:
         for point_idx in range(self.number_points):
             region = self.v_regions[point_idx]
             for region_point_idx in region:
-                region_idx_to_point_idx_all[region_point_idx].append(point_idx)
                 if region_point_idx == -1:
                     continue
                 region_idx_to_point_idx[region_point_idx].append(point_idx)
@@ -118,6 +116,12 @@ class Mesh:
             adjacent_points,
             adjacent_vertices,
             region_idx_to_point_idx,
-            region_idx_to_point_idx_all,
             adjacency_map
         )
+
+    def remove_outliers(self):
+        # The Voronoi algorithm will create points outside of [0, 1] at the very edges
+        # we want to remove them or the map might extend far, far beyond its borders
+        for vertex_idx in range(self.v_number_vertices):
+            point = self.points[self.v_adjacencies.region_idx_to_point_idx[vertex_idx]]
+            self.v_vertices[vertex_idx, :] = np.mean(point, 0)
