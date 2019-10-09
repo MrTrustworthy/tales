@@ -22,13 +22,13 @@ class Adjacency:
 
 
 class WorldMap(Component):
-    def __init__(self, num_nodes: int = 1024, seed: int = 5):
+    def __init__(self, num_nodes: int = 1024, seed: int = 10):
         self.num_nodes = num_nodes
         self.mesh = Mesh(number_points=num_nodes, seed=seed)
 
 
 class Mesh:
-    def __init__(self, number_points: int = 16, seed: int = 5):
+    def __init__(self, number_points: int, seed: int):
         self.number_points = number_points
         self.seed = seed
 
@@ -162,9 +162,11 @@ class Mesh:
         elevation = np.zeros(self.v_number_vertices + 1)
         elevation[:-1] = 0.5 + ((self.v_distorted_vertices - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
         elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(self.v_vertices, 0.5)
-        mountains = np.random.random((50, 2))
+        mountains = np.random.random((5, 2))
+
+        # this doesn't seem to be doing much
         for m in mountains:
-            self.elevation[:-1] += np.exp(-distance(self.v_vertices, m) ** 2 / (2 * 0.05 ** 2)) ** 2
+            self.elevation[:-1] += np.exp(-distance(self.v_vertices, m) ** 2 / 0.005) ** 2
 
         along = (((self.v_distorted_vertices - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
 

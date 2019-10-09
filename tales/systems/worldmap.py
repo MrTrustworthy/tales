@@ -48,16 +48,17 @@ class MapDrawingSystem(System):
             drawable_poly = np.concatenate([center, verts.flatten(), verts.flatten()[:2]])
             amount = len(drawable_poly) // 2
 
-            color_number = np.array([mesh.elevation[rvi] for rvi in vertice_indicies]).mean()
+            # assemble colors based on the elevation of the vertices we draw
+            color_number = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
+            mean = [color_number.mean()]  # use the mean as an approximation of the center
+            color_number = np.concatenate([mean, color_number, [color_number[0]]])
             color_number_norm = (color_number - mesh.elevation.min()) / (mesh.elevation.max() - mesh.elevation.min())
-
-            colors = col_from_number(color_number_norm * 255 * 3)
-            print("COLOR:")
+            colors = np.array([col_from_number(cnn * 255 * 3) for cnn in color_number_norm]).flatten()
 
             seed(center[0] ** center[1])
 
             pyglet.graphics.vertex_list(
                 amount,
                 ('v2f/static', drawable_poly * self.draw_scale + 100),
-                ('c3B', colors * amount)
+                ('c3B', colors)
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
