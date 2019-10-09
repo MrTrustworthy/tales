@@ -276,12 +276,9 @@ class MapGrid(object):
     def mixed_heightmap(self):
         mode1, mode2 = self.mode.split("/")
         hm1 = self.single_heightmap(mode1)
-        , mode1, hm1.max(), hm1.min(), hm1.mean()
         hm2 = self.single_heightmap(mode2)
-        , mode2, hm2.max(), hm2.min(), hm2.mean()
         mix = 20 * (self.dvxs[:, 0] - self.dvxs[:, 1])
         mixing = 1 / (1 + np.exp(-mix))
-        , mixing.max(), mixing.min(), mixing.mean()
         self.elevation[:-1] = mixing * hm2 + (1 - mixing) * hm1
         self.clean_coast()
 
@@ -294,7 +291,6 @@ class MapGrid(object):
         mountains = np.random.random((50, 2))
         for m in mountains:
             self.elevation[:-1] += np.exp(-distance(self.vxs, m) ** 2 / (2 * 0.05 ** 2)) ** 2
-        , self.elevation[:-1][self.edge].max()
 
         along = (((self.dvxs - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
         self.erodability = np.exp(4 * np.arctan(along))
@@ -328,7 +324,6 @@ class MapGrid(object):
             v = np.random.normal(0, 0.05)
             d = ((x - u) ** 2 + (y - v) ** 2) ** 0.5
             eruption = np.maximum(1 + 0.2 * i - d / 0.15, 0) ** 2
-            , self.vxs[np.argmax(eruption), :]
             self.elevation[:-1] = np.maximum(
                 self.elevation[:-1], eruption)
             self.do_erosion(20, 0.005)
@@ -363,7 +358,6 @@ class MapGrid(object):
         theta = np.random.random() * 2 * np.pi
         dvxs = self.dvxs
         x = (dvxs[:, 0] - .5) * np.cos(theta) + (dvxs[:, 1] - .5) * np.sin(theta)
-        y = (dvxs[:, 0] - .5) * -np.sin(theta) + (dvxs[:, 1] - .5) * np.cos(theta)
         self.elevation[:-1] = x + 20 + 2 * self.perlin()
         self.erodability[:] = 1
         self.do_erosion(50, 0.005)

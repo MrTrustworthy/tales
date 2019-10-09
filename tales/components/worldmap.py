@@ -2,10 +2,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict
 
+import noise
 import numpy as np
 from scipy import spatial
 
 from tales.components import Component
+import pdb
+
+from tales.utils.math import distance
 
 
 @dataclass
@@ -49,15 +53,19 @@ class Mesh:
 
         # v_regions map the index of a point in self.points to a region
         self.v_regions = [self.vor.regions[idx] for idx in self.vor.point_region]
-        self.v_vertices = self.vor.vertices
+        self.v_vertices = self.vor.vertices  # vxs
         self.v_number_vertices = self.v_vertices.shape[0]
 
         # adjacencies give us maps that we can use to quickly look up nodes that belong together
         self.v_adjacencies = self._build_adjacencies()
         self.remove_outliers()
         self.v_adjacencies.vertex_is_edge = self.calculate_edges()
+        self.v_distorted_vertices = self.distorted_vertices(self.v_vertices)
+        self.elevation = np.zeros(self.v_number_vertices + 1)
+        self.erodability = np.ones(self.v_number_vertices)
+        self.elevation = self.generate_heightmap()
 
-        # pdb.set_trace()
+        #pdb.set_trace()
 
     def _generate_good_points(self) -> np.ndarray:
         np.random.seed(self.seed)
@@ -136,3 +144,55 @@ class Mesh:
             if -1 in adjs:
                 edges[vertex_idx] = True
         return edges
+
+    def distorted_vertices(self, vertices: np.ndarray):
+        distorted_vertices = vertices.copy()
+        noises = self.perlin_on_vertices(vertices)
+        distorted_vertices[:, 0] += noises
+        distorted_vertices[:, 1] += noises
+        return distorted_vertices
+
+    def perlin_on_vertices(self, vertices: np.ndarray):
+        assert vertices.shape[1] == 2
+        base = np.random.randint(1000)
+        return np.array([noise.pnoise2(x, y, lacunarity=1.7, octaves=3, base=base) for x, y in vertices])
+
+
+    def generate_heightmap(self):
+        elevation = np.zeros(self.v_number_vertices + 1)
+        elevation[:-1] = 0.5 + ((self.v_distorted_vertices - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
+        elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(self.v_vertices, 0.5)
+        mountains = np.random.random((50, 2))
+        for m in mountains:
+            self.elevation[:-1] += np.exp(-distance(self.v_vertices, m) ** 2 / (2 * 0.05 ** 2)) ** 2
+
+        along = (((self.v_distorted_vertices - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
+
+        return elevation
+
+    def shore_heightmap(self):
+
+        n = self.nvxs
+        self.elevation = np.zeros(n + 1)
+        self.elevation[:-1] = 0.5 + ((self.dvxs - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
+        self.elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(self.vxs, 0.5)
+        mountains = np.random.random((50, 2))
+        for m in mountains:
+            self.elevation[:-1] += np.exp(-distance(self.vxs, m) ** 2 / (2 * 0.05 ** 2)) ** 2
+
+        along = (((self.dvxs - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
+        self.erodability = np.exp(4 * np.arctan(along))
+
+        for i in range(5):
+            self.rift()
+            self.relax()
+        for i in range(5):
+            self.relax()
+        self.normalize_elevation()
+
+        sealevel = np.random.randint(20, 40)
+        self.raise_sealevel(sealevel)
+        self.do_erosion(100, 0.025)
+
+        self.raise_sealevel(np.random.randint(sealevel, sealevel + 20))
+        self.clean_coast()
