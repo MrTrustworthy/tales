@@ -8,8 +8,9 @@ from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
 
 
-def col_from_number(number):
-    number = int(number)
+def _col_from_number(number):
+    number = int(number) * 255 * 3
+
     if number <= 255:
         return number, 0, 0
     number = number % 255
@@ -19,6 +20,11 @@ def col_from_number(number):
     if number <= 255:
         return 255, 255, number
     raise ValueError(f"Number {number} too big")
+
+
+def col_from_number(number):
+    n = int(number * 255)
+    return n, n, n
 
 
 class MapDrawingSystem(System):
@@ -49,16 +55,16 @@ class MapDrawingSystem(System):
             amount = len(drawable_poly) // 2
 
             # assemble colors based on the elevation of the vertices we draw
-            color_number = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
-            mean = [color_number.mean()]  # use the mean as an approximation of the center
-            color_number = np.concatenate([mean, color_number, [color_number[0]]])
-            color_number_norm = (color_number - mesh.elevation.min()) / (mesh.elevation.max() - mesh.elevation.min())
-            colors = np.array([col_from_number(cnn * 255 * 3) for cnn in color_number_norm]).flatten()
+            color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
+            mean = [color_numbers.mean()]  # use the mean as an approximation of the center
+            color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
+            colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
+
 
             seed(center[0] ** center[1])
 
             pyglet.graphics.vertex_list(
                 amount,
                 ('v2f/static', drawable_poly * self.draw_scale + 100),
-                ('c3B', colors)
+                ('c3B/static', colors)
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)

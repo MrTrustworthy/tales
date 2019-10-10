@@ -22,7 +22,7 @@ class Adjacency:
 
 
 class WorldMap(Component):
-    def __init__(self, num_nodes: int = 1024, seed: int = 10):
+    def __init__(self, num_nodes: int = 1024, seed: int = 4):
         self.num_nodes = num_nodes
         self.mesh = Mesh(number_points=num_nodes, seed=seed)
 
@@ -32,7 +32,7 @@ class Mesh:
         self.number_points = number_points
         self.seed = seed
 
-        self.points = self._generate_good_points()
+        self.points = self._improve_points(self._generate_points())
 
         # points
         #       Coordinates of input points.
@@ -62,19 +62,17 @@ class Mesh:
         self.v_adjacencies.vertex_is_edge = self.calculate_edges()
         self.v_distorted_vertices = self.distorted_vertices(self.v_vertices)
         self.elevation = np.zeros(self.v_number_vertices + 1)
-        self.erodability = np.ones(self.v_number_vertices)
-        self.elevation = self.generate_heightmap()
+        self.elevation, self.erodability = self.generate_heightmap()
 
-        #pdb.set_trace()
+        # pdb.set_trace()
 
-    def _generate_good_points(self) -> np.ndarray:
+    def _generate_points(self) -> np.ndarray:
         np.random.seed(self.seed)
         points = np.random.random((self.number_points, 2))
-        good_points = self._improve_points(points)
-        # TODO reduce points to the extent
-        return good_points
+        return points
 
     def _improve_points(self, points: np.ndarray, iterations=2) -> np.ndarray:
+        """Moves points a little further away from each other to make all 'tiles' more equal in size and spread"""
         for _ in range(iterations):
             vor = spatial.Voronoi(points)
             newpts = []
@@ -157,7 +155,6 @@ class Mesh:
         base = np.random.randint(1000)
         return np.array([noise.pnoise2(x, y, lacunarity=1.7, octaves=3, base=base) for x, y in vertices])
 
-
     def generate_heightmap(self):
         elevation = np.zeros(self.v_number_vertices + 1)
         elevation[:-1] = 0.5 + ((self.v_distorted_vertices - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
@@ -168,8 +165,41 @@ class Mesh:
         for m in mountains:
             self.elevation[:-1] += np.exp(-distance(self.v_vertices, m) ** 2 / 0.005) ** 2
 
-        along = (((self.v_distorted_vertices - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
+        zero_mean_distortions = self.v_distorted_vertices - self.v_distorted_vertices.mean()
+        random_1_2 = np.random.normal(0, 2, (1, 2))
+        random_scalar = np.random.normal(0, 0.5)
+        along = ((zero_mean_distortions * random_1_2).sum(1) + random_scalar) * 10
+        erodability = np.exp(4 * np.arctan(along))
 
+        for i in range(5):
+            self.create_rift(elevation)
+            self.relax(elevation)
+        for i in range(5):
+            self.relax(elevation)
+        elevation = self.normalize_elevation(elevation)
+        return elevation, erodability
+
+    def create_rift(self, elevation):
+        side = 5 * (distance(self.v_distorted_vertices, 0.5) ** 2 - 1)
+        value = np.random.normal(0, 0.3)
+        elevation[:-1] += np.arctan(side) * value
+
+    def relax(self, elevation: np.ndarray):
+        """Modifies neighboring elevation vertices to be closer in height, smoothing heightmap"""
+        newelev = np.zeros_like(elevation[:-1])
+        for u in range(self.v_number_vertices):
+            adjs = [v for v in self.v_adjacencies.adjacent_vertices[u] if v != -1]
+            if len(adjs) < 2:
+                continue
+            newelev[u] = np.mean(elevation[adjs])
+        elevation[:-1] = newelev
+
+
+    def normalize_elevation(self, elevation: np.ndarray):
+        elevation = (elevation - elevation.min()) / (elevation.max() - elevation.min())
+        assert 1 >= elevation.max() and elevation.min() >= 0
+        elevation **= 0.5
+        print(elevation.mean())
         return elevation
 
     def shore_heightmap(self):
@@ -183,7 +213,6 @@ class Mesh:
             self.elevation[:-1] += np.exp(-distance(self.vxs, m) ** 2 / (2 * 0.05 ** 2)) ** 2
 
         along = (((self.dvxs - 0.5) * np.random.normal(0, 2, (1, 2))).sum(1) + np.random.normal(0, 0.5)) * 10
-        self.erodability = np.exp(4 * np.arctan(along))
 
         for i in range(5):
             self.rift()
