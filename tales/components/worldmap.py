@@ -22,7 +22,7 @@ class Adjacency:
 
 
 class WorldMap(Component):
-    def __init__(self, num_nodes: int = 1024, seed: int = 4):
+    def __init__(self, num_nodes: int = 1024, seed: int = 89):
         self.num_nodes = num_nodes
         self.mesh = Mesh(number_points=num_nodes, seed=seed)
 
@@ -176,7 +176,8 @@ class Mesh:
             self.relax(elevation)
         for i in range(5):
             self.relax(elevation)
-        elevation = self.normalize_elevation(elevation)
+        self.soften_elevation(elevation)
+
         return elevation, erodability
 
     def create_rift(self, elevation):
@@ -194,13 +195,11 @@ class Mesh:
             newelev[u] = np.mean(elevation[adjs])
         elevation[:-1] = newelev
 
-
-    def normalize_elevation(self, elevation: np.ndarray):
+    def soften_elevation(self, elevation: np.ndarray):
+        # noinspection PyArgumentList
         elevation = (elevation - elevation.min()) / (elevation.max() - elevation.min())
         assert 1 >= elevation.max() and elevation.min() >= 0
         elevation **= 0.5
-        print(elevation.mean())
-        return elevation
 
     def shore_heightmap(self):
 
@@ -219,7 +218,7 @@ class Mesh:
             self.relax()
         for i in range(5):
             self.relax()
-        self.normalize_elevation()
+        self.soften_elevation()
 
         sealevel = np.random.randint(20, 40)
         self.raise_sealevel(sealevel)
