@@ -453,13 +453,7 @@ class MapGrid(object):
             tries += 1
             sinks = self.get_sinks()
             if np.all(sinks == -1):
-                if tries > 1:
-                    print
-                    tries, "tries"
                 return
-            if tries == 1:
-                , np.sum(sinks != -1), np.mean(self.vxs[sinks
-                                                                   != -1, :], 0),
             h, u, v = self.find_lowest_sill(sinks)
             sink = sinks[u]
             if self.downhill[v] != -1:

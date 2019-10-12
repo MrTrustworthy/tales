@@ -22,9 +22,12 @@ def _col_from_number(number):
     raise ValueError(f"Number {number} too big")
 
 
-def col_from_number(number):
-    n = int(number * 255)
-    return n, n, n
+def col_from_number(number, base=100):
+    assert 0 <= base <= 255
+    n = int(min(abs(number) * base + base, 255))
+    if number < 0:
+        return (0, 0, n)
+    return (n, n, 0)
 
 
 class MapDrawingSystem(System):
@@ -37,11 +40,14 @@ class MapDrawingSystem(System):
         self.centers = centers
         self.edges = edges
 
-        self.cache = {}
+        self.step = 0
 
     def update(self, entity: Entity, *args, **kwargs):
+        self.step += 1
         map = entity.get_component_by_class(WorldMap)
         mesh = map.mesh
+
+        mesh.elevation = mesh.erode(mesh.elevation, mesh.erodability, 10, 0.01)
 
         for i, center in enumerate(mesh.points):
             # take the center point and all the vertices that define that points' "region"
@@ -56,10 +62,10 @@ class MapDrawingSystem(System):
 
             # assemble colors based on the elevation of the vertices we draw
             color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
-            mean = [color_numbers.mean()]  # use the mean as an approximation of the center
+            mean = [np.median(color_numbers)]  # use the median as an approximation of the center
+
             color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
-
 
             seed(center[0] ** center[1])
 
@@ -68,3 +74,13 @@ class MapDrawingSystem(System):
                 ('v2f/static', drawable_poly * self.draw_scale + 100),
                 ('c3B/static', colors)
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
+
+        if self.centers:
+            draw_points = mesh.points.flatten() * self.draw_scale + 100
+            point_amount = len(draw_points) // 2
+            pyglet.graphics.draw(
+                point_amount,
+                pyglet.gl.GL_POINTS,
+                ('v2f', draw_points),
+                ('c3B', (255, 0, 0) * point_amount)
+            )
