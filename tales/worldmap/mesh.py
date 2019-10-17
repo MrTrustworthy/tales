@@ -10,13 +10,14 @@ from typing import Dict, Tuple, Optional, List
 from tales.utils.math import distance
 
 ndarr = np.ndarray
+IntListDict = Dict[int, List[int]]
 
 
 @dataclass
 class Adjacency:
-    adjacent_points: Dict[int, List[int]]
-    adjacent_vertices: Dict[int, List[int]]  # adj_vxs
-    region_idx_to_point_idx: Dict[int, List[int]]  # vx_regions
+    adjacent_points: IntListDict
+    adjacent_vertices: IntListDict  # adj_vxs
+    region_idx_to_point_idx: IntListDict  # vx_regions
     adjacency_map: ndarr  # adj_mat
     vertex_is_edge: np.array  # self.edge
 
@@ -66,7 +67,7 @@ class Mesh:
         self.vor = spatial.Voronoi(self.center_points)
 
         # v_regions map the index of a point in self.center_points to a region
-        self.v_regions = [self.vor.regions[idx] for idx in self.vor.point_region]
+        self.v_regions: List[List[int]] = [self.vor.regions[idx] for idx in self.vor.point_region]
 
         self.v_number_vertices = self.vor.vertices.shape[0]
 
@@ -103,9 +104,9 @@ class Mesh:
 
     def _calculate_adjacencies(self) -> Adjacency:
 
-        adjacent_points = defaultdict(list)
-        adjacent_vertices = defaultdict(list)
-        region_idx_to_point_idx = defaultdict(list)
+        adjacent_points: IntListDict = defaultdict(list)
+        adjacent_vertices: IntListDict = defaultdict(list)
+        region_idx_to_point_idx: IntListDict = defaultdict(list)
         adjacency_map = np.zeros((self.v_number_vertices, 3), np.int32) - 1
 
         # find all points that are neighbouring a different point
@@ -130,8 +131,6 @@ class Mesh:
                     continue
                 region_idx_to_point_idx[region_point_idx].append(point_idx)
 
-        import pdb; pdb.set_trace()
-
         return Adjacency(
             adjacent_points,
             adjacent_vertices,
@@ -149,7 +148,7 @@ class Mesh:
             vertices[vertex_idx, :] = np.mean(point, 0)
         return vertices
 
-    def _calculate_edges(self, adjacent_vertices: ndarr) -> ndarr:
+    def _calculate_edges(self, adjacent_vertices: IntListDict) -> ndarr:
         n = self.v_number_vertices
         edges = np.zeros(n, np.bool)
         for vertex_idx in range(n):
@@ -157,7 +156,6 @@ class Mesh:
             if -1 in adjs:
                 edges[vertex_idx] = True
         return edges
-
 
     def _distorted_vertices(self, vertices: ndarr) -> ndarr:
         assert vertices.shape[1] == 2
@@ -183,9 +181,11 @@ class Elevator:
 
     def generate_heightmap(self) -> ndarr:
         num_verts = self.mesh.v_number_vertices
+        num_points = self.mesh.number_points
         adj = self.mesh.v_adjacencies
         distortions = self.mesh.v_distorted_vertices
         verts = self.mesh.v_vertices
+        regions = self.mesh.v_regions
 
         elevation = np.zeros(num_verts + 1)
         elevation[:-1] = 0.5 + ((distortions - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
@@ -215,6 +215,13 @@ class Elevator:
                                     0.025)
         elevation = Elevator._raise_sealevel(elevation, np.random.randint(raise_amount, raise_amount + 20))
         elevation = Elevator._clean_coast(elevation, adj, num_verts, 3, True)
+
+        downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+        elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
+        downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+        flow = Elevator._calc_flow(elevation, downhill, num_verts)
+        slopes = Elevator._calc_slopes(elevation, downhill, verts)
+        elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
         self.elevation, self.erodability = elevation, erodability
         return elevation
@@ -401,3 +408,11 @@ class Elevator:
         edge, adj = best_edge_corner
 
         return height, edge, adj
+
+    @staticmethod
+    def _calc_elevation_pts(num_points: int, regions: List[List[int]], elevation: ndarr) -> ndarr:
+        elevation_pts = np.zeros(num_points)
+        for p in range(num_points):
+            if regions[p]:
+                elevation_pts[p] = np.mean(elevation[regions[p]])
+        return elevation_pts
