@@ -1,11 +1,10 @@
-from random import randint, seed
-
 import numpy as np
 import pyglet
 
-from tales.components.worldmap import WorldMap, Mesh
+from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
+from tales.worldmap.mesh import Mesh
 
 
 def _col_from_number(number):
