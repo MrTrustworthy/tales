@@ -9,7 +9,6 @@ from scipy import spatial, sparse
 from scipy.sparse import linalg
 
 from tales.components import Component
-import pdb
 
 from tales.utils.math import distance
 
@@ -261,7 +260,6 @@ class Mesh:
         return elevation
 
     # EROSION
-    @copy_first_arg
     def erode(self, elevation: ndarr, erodability: ndarr, iterations: int, rate: float = 0.01) -> ndarr:
         """ Removes landmass next to water
 
@@ -271,50 +269,52 @@ class Mesh:
         :param rate: smaller rates lead to "thinner" erosion lines (river beds, ...)
         :return:
         """
-        downhill = None
+        assert iterations > 0, "Need at least 1 iteration of erosion"
+        elevation = elevation.copy()
         for _ in range(iterations):
-            downhill = self.erode_calc_downhill(elevation)
-            flow = self.erode_calc_flow(elevation, downhill)
-            slopes = self.erode_calc_slopes(elevation, downhill)
-            elevation = self.erode_step(elevation, erodability, flow, slopes, rate)
-            elevation = self.erode_infill(elevation, downhill)
+            downhill = Mesh.erode_calc_downhill(elevation, self.v_adjacencies, self.v_number_vertices)
+            flow = Mesh.erode_calc_flow(elevation, downhill, self.v_number_vertices)
+            slopes = Mesh.erode_calc_slopes(elevation, downhill, self.v_vertices)
+            elevation = Mesh.erode_step(elevation, erodability, flow, slopes, rate)
+            elevation, downhill = self.erode_infill(elevation, downhill, self.v_adjacencies, self.v_number_vertices)
             elevation[-1] = 0
-        assert downhill is not None
         return elevation
 
-    @copy_first_arg
-    def erode_calc_downhill(self, elevation: ndarr):
-        n = self.v_number_vertices
-        adj = self.v_adjacencies
-        dhidxs = np.argmin(elevation[adj.adjacency_map], 1)
-        downhill = adj.adjacency_map[np.arange(n), dhidxs]
+    @staticmethod
+    def erode_calc_downhill(elevation: ndarr, adjacency: Adjacency, num_verts: int) -> ndarr:
+        """Calculates a "downhill" array
+
+        :param num_verts:
+        :param adjacency:
+        :param elevation:
+        :return: array of length len(vertices)-1
+        """
+        dhidxs = np.argmin(elevation[adjacency.adjacency_map], 1)
+        downhill = adjacency.adjacency_map[np.arange(num_verts), dhidxs]
         downhill[elevation[:-1] <= elevation[downhill]] = -1
-        downhill[adj.vertex_is_edge] = -1
+        downhill[adjacency.vertex_is_edge] = -1
         return downhill
 
-    @copy_first_arg
-    def erode_calc_flow(self, elevation: ndarr, downhill: ndarr):
-        n = self.v_number_vertices
-        rain = np.ones(n) / n
+    @staticmethod
+    def erode_calc_flow(elevation: ndarr, downhill: ndarr, num_verts: int) -> ndarr:
+        rain = np.ones(num_verts) / num_verts
         i = downhill[downhill != -1]
-        j = np.arange(n)[downhill != -1]
-        dmat = sparse.eye(n) - sparse.coo_matrix((np.ones_like(i), (i, j)), (n, n)).tocsc()
+        j = np.arange(num_verts)[downhill != -1]
+        dmat = sparse.eye(num_verts) - sparse.coo_matrix((np.ones_like(i), (i, j)), (num_verts, num_verts)).tocsc()
         flow = linalg.spsolve(dmat, rain)
         flow[elevation[:-1] <= 0] = 0
         return flow
 
-    @copy_first_arg
-    def erode_calc_slopes(self, elevation: ndarr, downhill: ndarr) -> ndarr:
-        dist = distance(self.v_vertices, self.v_vertices[downhill, :])
+    @staticmethod
+    def erode_calc_slopes(elevation: ndarr, downhill: ndarr, vertices: ndarr) -> ndarr:
+        dist = distance(vertices, vertices[downhill, :])
         slope = (elevation[:-1] - elevation[downhill]) / (dist + 1e-9)
         slope[downhill == -1] = 0
         return slope
 
-    @copy_first_arg
-    def erode_step(self,
-                   elevation: ndarr, erodability: ndarr,
-                   flow: ndarr, slopes: ndarr, max_step: float
-                   ) -> ndarr:
+    @staticmethod
+    def erode_step(elevation: ndarr, erodability: ndarr, flow: ndarr, slopes: ndarr, max_step: float) -> ndarr:
+        elevation = elevation.copy()
         river_rate = -flow ** 0.5 * slopes  # river erosion
         slope_rate = -slopes ** 2 * erodability  # slope smoothing
         rate = 1000 * river_rate + slope_rate
@@ -322,55 +322,57 @@ class Mesh:
         elevation[:-1] += rate / np.abs(rate).max() * max_step
         return elevation
 
-    @copy_first_arg
-    def erode_infill(self, elevation: ndarr, downhill: ndarr) -> ndarr:
-
-        def get_sinks(elevation: ndarr, downhill: ndarr) -> ndarr:
-            sinks = downhill.copy()
-            water = elevation[:-1] <= 0
-            sinklist = np.where((sinks == -1) & ~water & ~self.v_adjacencies.vertex_is_edge)[0]
-            sinks[sinklist] = sinklist
-            sinks[water] = -1
-            while True:
-                newsinks = sinks.copy()
-                newsinks[~water] = sinks[sinks[~water]]
-                newsinks[sinks == -1] = -1
-                if np.all(sinks == newsinks): break
-                sinks = newsinks
-            return sinks
-
-        def find_lowest_sill(elevation: ndarr, sinks: ndarr):
-            h = 10000
-            maps = np.any((sinks[self.v_adjacencies.adjacency_map] == -1) & self.v_adjacencies.adjacency_map != -1, 1)
-
-            edges = np.where((sinks != -1) & maps)[0]
-
-            bestuv = 0, 0
-            for u in edges:
-                adjs = [v for v in self.v_adjacencies.adjacent_vertices[u] if v != -1]
-                for v in adjs:
-                    if sinks[v] != -1:
-                        continue
-                    newh = max(elevation[v], elevation[u])
-                    if newh >= h:
-                        continue
-                    h = newh
-                    bestuv = u, v
-            assert h < 10000 and bestuv != (0, 0)
-            u, v = bestuv
-            return h, u, v
-
-        tries = 0
+    @staticmethod
+    def erode_infill(elevation: ndarr, downhill: ndarr, adj: Adjacency, num_verts: int) -> Tuple[ndarr, ndarr]:
+        elevation = elevation.copy()
         while True:
-            tries += 1
-            sinks = get_sinks(elevation, downhill)
+            sinks = Mesh.get_sinks(elevation, downhill, adj)
             if np.all(sinks == -1):
-                return elevation
-            h, u, v = find_lowest_sill(elevation, sinks)
+                return elevation, downhill
+            h, u, v = Mesh.find_lowest_sill(elevation, sinks, adj)
             sink = sinks[u]
             if downhill[v] != -1:
                 elevation[v] = elevation[downhill[v]] + 1e-5
             sinkelev = elevation[:-1][sinks == sink]
-            h = np.where(sinkelev < h, h + 0.001 * (h - sinkelev), sinkelev) + 1e-5
+            h = np.where(sinkelev < h, h + 1e-3 * (h - sinkelev), sinkelev) + 1e-5
             elevation[:-1][sinks == sink] = h
-            downhill = self.erode_calc_downhill(elevation)
+            downhill = Mesh.erode_calc_downhill(elevation, adj, num_verts)
+
+    @staticmethod
+    def get_sinks(elevation: ndarr, downhill: ndarr, adj: Adjacency) -> ndarr:
+        sinks = downhill.copy()
+        water = elevation[:-1] <= 0
+        sinklist = np.where((sinks == -1) & ~water & ~adj.vertex_is_edge)[0]
+        sinks[sinklist] = sinklist
+        sinks[water] = -1
+        while True:
+            newsinks = sinks.copy()
+            newsinks[~water] = sinks[sinks[~water]]
+            newsinks[sinks == -1] = -1
+            if np.all(sinks == newsinks):
+                break
+            sinks = newsinks
+        return sinks
+
+    @staticmethod
+    def find_lowest_sill(elevation: ndarr, sinks: ndarr, adjacency: Adjacency) -> Tuple[float, int, int]:
+
+        height = 10000
+        maps = np.any((sinks[adjacency.adjacency_map] == -1) & adjacency.adjacency_map != -1, 1)
+        edges = np.where((sinks != -1) & maps)[0]
+
+        best_edge_corner = 0, 0
+        for edge in edges:
+            adjs = [v for v in adjacency.adjacent_vertices[edge] if v != -1]
+            for adj in adjs:
+                if sinks[adj] != -1:
+                    continue
+                newh = max(elevation[adj], elevation[edge])
+                if newh >= height:
+                    continue
+                height = newh
+                best_edge_corner = edge, adj
+        assert height < 10000 and best_edge_corner != (0, 0)
+        edge, adj = best_edge_corner
+
+        return height, edge, adj
