@@ -8,10 +8,9 @@ Number = Union[int, float]
 
 def distance(a, b):
     disp2 = (a - b) ** 2
-    if len(disp2.shape) == 2:
-        return np.sum(disp2, 1) ** 0.5
-    else:
-        return np.sum(disp2) ** 0.5
+    assert len(disp2.shape) == 2
+    return np.sum(disp2, 1) ** 0.5
+
 
 
 class Vector2:

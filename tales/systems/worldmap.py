@@ -45,13 +45,13 @@ class MapDrawingSystem(System):
         self.step += 1
         map = entity.get_component_by_class(WorldMap)
         mesh = map.mesh
-        #mesh.elevation = mesh.erode(mesh.elevation, mesh.erodability, 10, 0.01)
+        # mesh.elevation = mesh.erode(mesh.elevation, mesh.erodability, 10, 0.01)
 
         self.draw_map(mesh)
 
     def draw_map(self, mesh: Mesh):
 
-        for i, center in enumerate(mesh.points):
+        for i, center in enumerate(mesh.center_points):
             # take the center point and all the vertices that define that points' "region"
             region = mesh.v_regions[i]
             vertices = mesh.v_vertices
@@ -67,6 +67,7 @@ class MapDrawingSystem(System):
             mean = [np.median(color_numbers)]  # use the median as an approximation of the center
 
             color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
+            
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
 
             pyglet.graphics.vertex_list(
@@ -75,12 +76,14 @@ class MapDrawingSystem(System):
                 ('c3B/static', colors)
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
 
-        if self.centers:
-            draw_points = mesh.points.flatten() * self.draw_scale + 100
-            point_amount = len(draw_points) // 2
-            pyglet.graphics.draw(
-                point_amount,
-                pyglet.gl.GL_POINTS,
-                ('v2f', draw_points),
-                ('c3B', (255, 0, 0) * point_amount)
-            )
+    def draw_centers(self, mesh: Mesh):
+        if not self.centers:
+            return
+        draw_points = mesh.center_points.flatten() * self.draw_scale + 100
+        point_amount = len(draw_points) // 2
+        pyglet.graphics.draw(
+            point_amount,
+            pyglet.gl.GL_POINTS,
+            ('v2f', draw_points),
+            ('c3B', (255, 0, 0) * point_amount)
+        )

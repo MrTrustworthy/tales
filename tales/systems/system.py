@@ -17,8 +17,8 @@ class System:
     TYPE: SystemType = SystemType.GAMEPLAY
 
     def __init__(self, world: World):
-        self.system_type = self.TYPE  # is set on the subclass
         self.world: World = world
+        self.system_type = self.TYPE  # is set on the subclass
         self.components: List[Type[Component]] = self.COMPONENTS  # is set on the subclass
 
     def update_all(self, *args, **kwargs):
