@@ -13,7 +13,7 @@ ndarr = np.ndarray
 IntListDict = Dict[int, List[int]]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Adjacency:
     adjacent_points: IntListDict
     adjacent_vertices: IntListDict  # adj_vxs
@@ -22,18 +22,25 @@ class Adjacency:
     vertex_is_edge: np.array  # self.edge
 
 
+@dataclass(frozen=True)
+class MapParameters:
+    number_points: int = 1024
+    seed: int = 23
+    point_smoothing: int = 2  # moves center points away from each other. decreasing effectiveness above ~4
+
+
 class MeshGenerator:
 
-    def __init__(self, number_points: int, seed: int):
-        self.number_points = number_points
-        self.seed = seed
+    def __init__(self, map_params: MapParameters):
+
+        self.map_params = map_params
 
         self.mesh: Optional[Mesh] = None
         self.elevator: Optional[Elevator] = None
 
     def build_mesh(self) -> "Mesh":
-        np.random.seed(self.seed)
-        self.mesh = Mesh(self.number_points)
+        np.random.seed(self.map_params.seed)
+        self.mesh = Mesh(self.map_params)
         self.elevator = Elevator(self.mesh)
         self.elevator.generate_heightmap()
         self.update_elevation()
@@ -44,10 +51,11 @@ class MeshGenerator:
 
 
 class Mesh:
-    def __init__(self, number_points: int):
-        self.number_points = number_points
+    def __init__(self, map_params: MapParameters):
+        self.map_params = map_params
+        self.number_points = self.map_params.number_points
 
-        self.center_points = self._generate_points(2)
+        self.center_points = self._generate_points(self.map_params.point_smoothing)
 
         # points
         #       Coordinates of input points.
