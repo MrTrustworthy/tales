@@ -5,7 +5,7 @@ import numpy as np
 from dataclasses import dataclass
 from scipy import spatial, sparse
 from scipy.sparse import linalg
-from typing import Any, Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 from tales.utils.math import distance
 
@@ -14,9 +14,9 @@ ndarr = np.ndarray
 
 @dataclass
 class Adjacency:
-    adjacent_points: Dict[Any, Any]
-    adjacent_vertices: Dict[Any, Any]  # adj_vxs
-    region_idx_to_point_idx: Dict[Any, Any]  # vx_regions
+    adjacent_points: Dict[int, List[int]]
+    adjacent_vertices: Dict[int, List[int]]  # adj_vxs
+    region_idx_to_point_idx: Dict[int, List[int]]  # vx_regions
     adjacency_map: ndarr  # adj_mat
     vertex_is_edge: np.array  # self.edge
 
@@ -129,6 +129,8 @@ class Mesh:
                 if region_point_idx == -1:
                     continue
                 region_idx_to_point_idx[region_point_idx].append(point_idx)
+
+        import pdb; pdb.set_trace()
 
         return Adjacency(
             adjacent_points,

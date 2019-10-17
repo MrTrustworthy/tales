@@ -1,5 +1,6 @@
 import numpy as np
 import pyglet
+from typing import Tuple
 
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
@@ -21,12 +22,15 @@ def _col_from_number(number):
     raise ValueError(f"Number {number} too big")
 
 
-def col_from_number(number, base=100):
+def col_from_number(number, base=100) -> Tuple[int, int, int]:
     assert 0 <= base <= 255
     n = int(min(abs(number) * base + base, 255))
     if number < 0:
-        return (0, 0, n)
-    return (n, n, 0)
+        return 0, 0, n
+    elif number > 0.7:
+        return n, n, n
+    else:
+        return n, n, 0
 
 
 class MapDrawingSystem(System):
@@ -67,7 +71,6 @@ class MapDrawingSystem(System):
             mean = [np.median(color_numbers)]  # use the median as an approximation of the center
 
             color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
-            
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
 
             pyglet.graphics.vertex_list(
