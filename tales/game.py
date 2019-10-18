@@ -4,6 +4,7 @@ from tales.components import Drawable, Position, Collider, Movement
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems import UnitDrawingSystem, MovementSystem, CollisionSystem
+from tales.systems.fps_display import FPSDisplaySystem
 from tales.systems.system import SystemType
 from tales.systems.map_drawing import MapDrawingSystem
 from tales.world import World
@@ -37,6 +38,7 @@ def make_systems(world):
         UnitDrawingSystem(world, show_hitbox_circles=True),
         MovementSystem(world),
         CollisionSystem(world),
+        FPSDisplaySystem(world)
     ]
     return systems
 
@@ -44,7 +46,7 @@ def make_systems(world):
 class Game:
     def __init__(self):
         self.window_size = [1920, 1080]
-        self.fps = 60
+        self.fps = 60  # setting it over 60 seems to have no effect - is refresh rate considered in clock.schedule?
         self.window = pyglet.window.Window(width=self.window_size[0], height=self.window_size[1], caption="Tales")
 
     def run(self):

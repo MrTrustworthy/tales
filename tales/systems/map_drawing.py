@@ -53,7 +53,7 @@ class MapDrawingSystem(System):
         self.draw_map(mesh)
 
         #map.mesh_gen.update_params(MapParameters(coast_cleaning=self.step))
-        print(self.step)
+        #print(self.step)
 
     def draw_map(self, mesh: Mesh):
 
