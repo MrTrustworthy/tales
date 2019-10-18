@@ -1,5 +1,6 @@
 from tales.components import Component
-from tales.worldmap.mesh import MeshGenerator, MapParameters
+from tales.worldmap.dataclasses import MapParameters
+from tales.worldmap.mesh_generator import MeshGenerator
 
 
 class WorldMap(Component):

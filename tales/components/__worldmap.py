@@ -51,14 +51,17 @@ class WorldMap(Component):
 
 
 class Tile:
-
     @classmethod
     def from_voronoi(cls, voronoi) -> List["Tile"]:
         tiles = []
         for center, point_region_idx in zip(voronoi.points, voronoi.point_region):
             # take the center point and all the vertices that define that points' "region"
             region = voronoi.regions[point_region_idx]
-            verts = [voronoi.vertices[region_vertex_idx] for region_vertex_idx in region if region_vertex_idx != -1]
+            verts = [
+                voronoi.vertices[region_vertex_idx]
+                for region_vertex_idx in region
+                if region_vertex_idx != -1
+            ]
             vertices = np.array(verts)
             tile = cls(center, vertices)
             tiles.append(tile)
@@ -67,12 +70,18 @@ class Tile:
     def __init__(self, center, vertices):
         self.center = center
         self.vertices = vertices
-        self.drawable_polygon = np.concatenate([self.center, self.vertices.flatten(), self.vertices.flatten()[:2]])
+        self.drawable_polygon = np.concatenate(
+            [self.center, self.vertices.flatten(), self.vertices.flatten()[:2]]
+        )
         self.drawable_poly_length = len(self.drawable_polygon) // 2
-        self.drawable_poly_color = (randint(0, 255), randint(0, 255), randint(0, 255)) * self.drawable_poly_length
+        self.drawable_poly_color = (
+            randint(0, 255),
+            randint(0, 255),
+            randint(0, 255),
+        ) * self.drawable_poly_length
 
     def __repr__(self):
-        return f'C: {self.center} [{self.vertices}]'
+        return f"C: {self.center} [{self.vertices}]"
 
     def __hash__(self):
         return hash(str(self.center))

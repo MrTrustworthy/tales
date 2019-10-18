@@ -42,7 +42,6 @@ def make_systems(world):
 
 
 class Game:
-
     def __init__(self):
         self.window_size = [1920, 1080]
         self.fps = 60

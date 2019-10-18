@@ -12,9 +12,7 @@ def distance(a, b):
     return np.sum(disp2, 1) ** 0.5
 
 
-
 class Vector2:
-
     def __init__(self, x: Number, y: Number) -> None:
         self.x = x
         self.y = y

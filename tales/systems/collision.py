@@ -13,14 +13,16 @@ class CollisionSystem(System):
         movement = entity.get_component_by_class(Movement)
 
         others = [
-            (e.get_component_by_class(Collider), e.get_component_by_class(Position)) for e
-            in self.world.get_entities_with_components([Collider, Position])
+            (e.get_component_by_class(Collider), e.get_component_by_class(Position))
+            for e in self.world.get_entities_with_components([Collider, Position])
             if e is not entity
         ]
 
         for other_collider, other_pos in others:
-            if pos.position.distance_to(other_pos.position) < collider.size + other_collider.size:
-                pos.position.update(movement.last_step)
-                entity.delete_component(movement)
-                print(f"Collision of {entity} at {pos}, resetting position and clearing movement")
-                return
+            if not (pos.position.distance_to(other_pos.position) < collider.size + other_collider.size):
+                continue
+
+            pos.position.update(movement.last_step)
+            entity.delete_component(movement)
+            print(f"Collision of {entity} at {pos}, resetting position and clearing movement")
+            return

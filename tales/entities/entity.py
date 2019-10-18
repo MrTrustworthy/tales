@@ -2,9 +2,13 @@ import itertools
 from typing import Type, TypeVar, Dict, List
 from uuid import uuid4
 
-from tales.components.component import Component, NoSuchComponentException, ComponentAlreadyExistsException
+from tales.components.component import (
+    Component,
+    NoSuchComponentException,
+    ComponentAlreadyExistsException,
+)
 
-ComponentVar = TypeVar('ComponentVar')
+ComponentVar = TypeVar("ComponentVar")
 
 
 class Entity:

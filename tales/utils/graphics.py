@@ -5,8 +5,9 @@ from typing import Tuple
 Color = Tuple[int, int, int]
 
 
-def get_circle_points(center_x: float, center_y: float, radius: float,
-                      num_segments: int = 128):
+def get_circle_points(
+    center_x: float, center_y: float, radius: float, num_segments: int = 128
+):
     """
     Draw a filled-in circle.
 

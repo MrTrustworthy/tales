@@ -60,23 +60,31 @@ class MapDrawingSystem(System):
             region = mesh.v_regions[i]
             vertices = mesh.v_vertices
 
-            vertice_indicies = [region_vertex_idx for region_vertex_idx in region if region_vertex_idx != -1]
+            vertice_indicies = [
+                region_vertex_idx
+                for region_vertex_idx in region
+                if region_vertex_idx != -1
+            ]
             verts = np.array([vertices[rvi] for rvi in vertice_indicies])
 
-            drawable_poly = np.concatenate([center, verts.flatten(), verts.flatten()[:2]])
+            drawable_poly = np.concatenate(
+                [center, verts.flatten(), verts.flatten()[:2]]
+            )
             amount = len(drawable_poly) // 2
 
             # assemble colors based on the elevation of the vertices we draw
             color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
-            mean = [np.median(color_numbers)]  # use the median as an approximation of the center
+            mean = [
+                np.median(color_numbers)
+            ]  # use the median as an approximation of the center
 
             color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
 
             pyglet.graphics.vertex_list(
                 amount,
-                ('v2f/static', drawable_poly * self.draw_scale + 100),
-                ('c3B/static', colors)
+                ("v2f/static", drawable_poly * self.draw_scale + 100),
+                ("c3B/static", colors),
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
 
     def draw_centers(self, mesh: Mesh):
@@ -87,6 +95,6 @@ class MapDrawingSystem(System):
         pyglet.graphics.draw(
             point_amount,
             pyglet.gl.GL_POINTS,
-            ('v2f', draw_points),
-            ('c3B', (255, 0, 0) * point_amount)
+            ("v2f", draw_points),
+            ("c3B", (255, 0, 0) * point_amount),
         )

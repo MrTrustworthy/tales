@@ -27,6 +27,5 @@ class Movement(Component):
 
 
 class Collider(Component):
-
     def __init__(self, x: int):
         self.size = x

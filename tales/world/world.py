@@ -5,7 +5,6 @@ from tales.entities.entity import Entity
 
 
 class World:
-
     def __init__(self, entities: List[Entity]):
         self.entities = entities
 
