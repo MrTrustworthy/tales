@@ -6,6 +6,7 @@ from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
 from tales.worldmap.mesh import Mesh
+from tales.worldmap.mesh_generator import MeshGenerator
 
 
 def _col_from_number(number):
@@ -37,19 +38,20 @@ class MapDrawingSystem(System):
     COMPONENTS = [WorldMap]
     TYPE = SystemType.RENDERING
 
-    def __init__(self, *args, draw_scale=800, centers=True, edges=True):
+    def __init__(self, *args, draw_scale=800, centers=False, cities=True):
         super().__init__(*args)
         self.draw_scale = draw_scale
         self.centers = centers
-        self.edges = edges
+        self.cities = cities
 
         self.step = 0
 
     def update(self, entity: Entity, *args, **kwargs):
         self.step += 1
         map = entity.get_component_by_class(WorldMap)
-        mesh = map.mesh_gen.mesh
-        self.draw_map(mesh)
+        self.draw_map(map.mesh_gen.mesh)
+        self.draw_centers(map.mesh_gen.mesh)
+        self.draw_cities(map.mesh_gen)
 
     def draw_map(self, mesh: Mesh):
 
@@ -76,6 +78,19 @@ class MapDrawingSystem(System):
                 ("v2f/static", drawable_poly * self.draw_scale + 100),
                 ("c3B/static", colors),
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
+
+    def draw_cities(self, mesh_gen: MeshGenerator):
+        if not self.cities:
+            return
+        draw_points = np.array([mesh_gen.mesh.v_vertices[i] for i in mesh_gen.elevator.cities])
+        draw_points = draw_points.flatten() * self.draw_scale + 100
+        point_amount = len(draw_points) // 2
+        pyglet.graphics.draw(
+            point_amount,
+            pyglet.gl.GL_POINTS,
+            ("v2f", draw_points),
+            ("c3B", (255, 0, 0) * point_amount),
+        )
 
     def draw_centers(self, mesh: Mesh):
         if not self.centers:

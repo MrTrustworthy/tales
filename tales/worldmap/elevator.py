@@ -16,7 +16,7 @@ class Elevator:
         self.elevation: Optional[ndarr] = None
         self.erodability: Optional[ndarr] = None
 
-    def generate_heightmap(self) -> ndarr:
+    def generate_heightmap(self):
         num_verts = self.mesh.v_number_vertices
         num_points = self.mesh.number_points
         adj = self.mesh.v_adjacencies
@@ -45,8 +45,23 @@ class Elevator:
         slopes = Elevator._calc_slopes(elevation, downhill, verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
-        self.elevation, self.erodability = elevation, erodability
-        return elevation
+        cities = Elevator._place_cities(10, elevation, verts, flow)
+
+        self.elevation, self.erodability, self.cities = elevation, erodability, cities
+
+    @staticmethod
+    def _place_cities(num_cities: int, elevation: ndarr, verts: ndarr, flow: ndarr):
+        city_score = flow ** 0.5
+        city_score[elevation[:-1] <= 0] = -9999999
+        cities = []
+        while len(cities) < num_cities:
+            newcity = np.argmax(city_score)
+            if np.random.random() < (len(cities) + 1) ** -0.2 and \
+                    0.1 < verts[newcity, 0] < 0.9 and \
+                    0.1 < verts[newcity, 1] < 0.9:
+                cities.append(newcity)
+            city_score -= 0.01 * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
+        return cities
 
     @staticmethod
     def _erode(
@@ -206,12 +221,7 @@ class Elevator:
         rain = np.ones(num_verts) / num_verts
         i = downhill[downhill != -1]
         j = np.arange(num_verts)[downhill != -1]
-        dmat = (
-                sparse.eye(num_verts)
-                - sparse.coo_matrix(
-            (np.ones_like(i), (i, j)), (num_verts, num_verts)
-        ).tocsc()
-        )
+        dmat = (sparse.eye(num_verts) - sparse.coo_matrix((np.ones_like(i), (i, j)), (num_verts, num_verts)).tocsc())
         flow = linalg.spsolve(dmat, rain)
         flow[elevation[:-1] <= 0] = 0
         return flow
