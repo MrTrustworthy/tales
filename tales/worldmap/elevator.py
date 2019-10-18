@@ -33,7 +33,7 @@ class Elevator:
         elevation = Elevator._soften_elevation(elevation, params)
 
         erodability = Elevator._create_erodability(vertice_noise)
-        elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, 1, 0.025)
+        elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, params)
 
         elevation = Elevator._raise_sealevel(elevation, params.percent_sea)
         elevation = Elevator._clean_coast(elevation, adj, num_verts, params)
@@ -51,19 +51,18 @@ class Elevator:
     @staticmethod
     def _erode(
             elevation: ndarr, erodability: ndarr, adj: Adjacency,
-            verts: ndarr, num_verts: int, iterations: int, rate: float
+            verts: ndarr, num_verts: int, params: MapParameters
     ) -> ndarr:
         """ Removes landmass next to water
 
         Smaller rates lead to "thinner" erosion lines (river beds, ...)
         """
-        assert iterations > 0, "Need at least 1 iteration of erosion"
         elevation = elevation.copy()
-        for _ in range(iterations):
+        for _ in range(params.erosion_iterations):
             downhill = Elevator._calc_downhill(elevation, adj, num_verts)
             flow = Elevator._calc_flow(elevation, downhill, num_verts)
             slopes = Elevator._calc_slopes(elevation, downhill, verts)
-            elevation = Elevator._erode_step(elevation, erodability, flow, slopes, rate)
+            elevation = Elevator._erode_step(elevation, erodability, flow, slopes, params.erosion_rate)
             elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
             elevation[-1] = 0
         return elevation
@@ -225,13 +224,15 @@ class Elevator:
         return slope
 
     @staticmethod
-    def _erode_step(elevation: ndarr, erodability: ndarr, flow: ndarr, slopes: ndarr, max_step: float, ) -> ndarr:
+    def _erode_step(elevation: ndarr, erodability: ndarr, flow: ndarr, slopes: ndarr, erosion_rate: float) -> ndarr:
         elevation = elevation.copy()
         river_rate = -flow ** 0.5 * slopes  # river erosion
         slope_rate = -slopes ** 2 * erodability  # slope smoothing
-        rate = 1000 * river_rate + slope_rate
-        rate[elevation[:-1] <= 0] = 0
-        elevation[:-1] += rate / np.abs(rate).max() * max_step
+        combined_rate = 1000 * river_rate + slope_rate
+        combined_rate[elevation[:-1] <= 0] = 0
+
+        erosion = combined_rate / np.abs(combined_rate).max()  # array of length num_vertices with values -1.0 to 0
+        elevation[:-1] += erosion * erosion_rate
         return elevation
 
     @staticmethod

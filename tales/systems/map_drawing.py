@@ -52,10 +52,9 @@ class MapDrawingSystem(System):
         mesh = map.mesh_gen.mesh
         self.draw_map(mesh)
 
-
-
-        #map.mesh_gen.update_params(MapParameters(percent_sea=self.step * 5))
-        #print(self.step * 5)
+        #factor = 0.1
+        #map.mesh_gen.update_params(MapParameters(erosion_rate=self.step*factor))
+        #print(self.step*factor)
 
     def draw_map(self, mesh: Mesh):
 

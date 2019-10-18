@@ -80,3 +80,20 @@ class MapParameters:
             (50, 80): "High sea level, majority of map is sea"
         }
     })
+    erosion_iterations: int = field(default=50, metadata={
+        "description": "Higher numbers lead to a more line-y elevation pattern with deltas and mountain passes",
+        "ranges": {
+            (0, 30): "Low erosion impact, very little visible erosion lines",
+            (30, 70): "Normal erosion lines, pronounced bays, deltas, half-islands and mountain passes",
+            (70, 150): "High erosion level, lots of land and water strings"
+        }
+    })
+    erosion_rate: float = field(default=0.25, metadata={
+        "description": "Higher numbers create more pronounced hills/valleys and half-islands. Scales exponentially",
+        "ranges": {
+            (0.0, 0.01): "Very low erosion rate, erosion lines barely visible",
+            (0.01, 0.1): "Low erosion rate, thin erosion lines are visible and get larger with increasing rate",
+            (0.1, 1): "Normal erosion rate, pronounced erosion lines visible in sea and land",
+            (2, 5): "High erosion rate, lots of small artefacts and tiny islands"
+        }
+    })
