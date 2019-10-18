@@ -50,12 +50,10 @@ class MapDrawingSystem(System):
         self.step += 1
         map = entity.get_component_by_class(WorldMap)
         mesh = map.mesh_gen.mesh
-        # mesh.elevation = mesh.erode(mesh.elevation, mesh.erodability, 10, 0.01)
-
         self.draw_map(mesh)
 
-        #map.mesh_gen.update_params(MapParameters(elevation_softness=self.step/5))
-        #print(self.step/5)
+        #map.mesh_gen.update_params(MapParameters(coast_cleaning=self.step))
+        print(self.step)
 
     def draw_map(self, mesh: Mesh):
 

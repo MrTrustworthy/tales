@@ -63,3 +63,11 @@ class MapParameters:
             (0.7, 2.5): "Heavy smoothing, elevation is very flat overall"
         }
     })
+    coast_cleaning: int = field(default=3, metadata={
+        "description": "Higher numbers create a smoother side-to-side elevation profile, and less spots in the middle",
+        "ranges": {
+            (0, 1): "Little cleaning, might have small spikes at the coast",
+            (1, 4): "Normal cleaning, most spikes and tiny islands are removed",
+            (4, 10): "High cleaning, should rarely result in any changes from normal cleaning"
+        }
+    })

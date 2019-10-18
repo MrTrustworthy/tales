@@ -42,7 +42,7 @@ class Elevator:
         raise_amount = np.random.randint(raise_amount, raise_amount + 20)
         elevation = Elevator._raise_sealevel(elevation, raise_amount)
 
-        elevation = Elevator._clean_coast(elevation, adj, num_verts, 3, True)
+        elevation = Elevator._clean_coast(elevation, adj, num_verts, params)
 
         downhill = Elevator._calc_downhill(elevation, adj, num_verts)
         elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
@@ -158,27 +158,41 @@ class Elevator:
         return elevation
 
     @staticmethod
-    def _clean_coast(elevation: ndarr, adj: Adjacency, num_verts: int, iterations: int, outwards: bool) -> ndarr:
+    def _clean_coast(elevation: ndarr, adj: Adjacency, num_verts: int, params: MapParameters) -> ndarr:
+        """Removes sharp spikes at coasts that are removed by water crashing into it
+
+        Basic principle: If all but one neighbors of a vertice are under water, lower it down to their mean
+        This may also remove small/tiny islands
+
+        This function quickly reaches a satisfying result at ~5 iterations,
+        after which no more changes will be performed.
+        """
         elevation = elevation.copy()
-        for _ in range(iterations):
+        for _ in range(params.coast_cleaning):
+
             new_elev = elevation[:-1].copy()
+
+            # lower ground vertices at the coast
             for u in range(num_verts):
+                # ignore edges and under-water vertices
                 if adj.vertex_is_edge[u] or elevation[u] <= 0:
                     continue
                 adjs = adj.adjacent_vertices[u]
-                adjelevs = elevation[adjs]
-                if np.sum(adjelevs > 0) == 1:
-                    new_elev[u] = np.mean(adjelevs[adjelevs <= 0])
+                neighbour_elevations = elevation[adjs]
+                if np.sum(neighbour_elevations > 0) == 1:
+                    new_elev[u] = np.mean(neighbour_elevations[neighbour_elevations <= 0])
             elevation[:-1] = new_elev
-            if outwards:
-                for u in range(num_verts):
-                    if adj.vertex_is_edge[u] or elevation[u] > 0:
-                        continue
-                    adjs = adj.adjacent_vertices[u]
-                    adjelevs = elevation[adjs]
-                    if np.sum(adjelevs <= 0) == 1:
-                        new_elev[u] = np.mean(adjelevs[adjelevs > 0])
-                elevation[:-1] = new_elev
+
+            # raise water vertices that are surrounded by ground
+            for u in range(num_verts):
+                # ignore edges and above-water vertices
+                if adj.vertex_is_edge[u] or elevation[u] > 0:
+                    continue
+                adjs = adj.adjacent_vertices[u]
+                neighbour_elevations = elevation[adjs]
+                if np.sum(neighbour_elevations <= 0) == 1:
+                    new_elev[u] = np.mean(neighbour_elevations[neighbour_elevations > 0])
+            elevation[:-1] = new_elev
         return elevation
 
     # EROSION
