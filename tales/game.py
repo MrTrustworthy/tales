@@ -45,7 +45,7 @@ def make_systems(world):
 
 class Game:
     def __init__(self):
-        self.window_size = [1920, 1080]
+        self.window_size = (1920, 1080)
         self.fps = 60  # setting it over 60 seems to have no effect - is refresh rate considered in clock.schedule?
         self.window = pyglet.window.Window(width=self.window_size[0], height=self.window_size[1], caption="Tales")
 

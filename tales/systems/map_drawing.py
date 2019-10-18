@@ -5,7 +5,6 @@ from typing import Tuple
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
-from tales.worldmap.dataclasses import MapParameters
 from tales.worldmap.mesh import Mesh
 
 
@@ -51,10 +50,6 @@ class MapDrawingSystem(System):
         map = entity.get_component_by_class(WorldMap)
         mesh = map.mesh_gen.mesh
         self.draw_map(mesh)
-
-        #factor = 0.1
-        #map.mesh_gen.update_params(MapParameters(erosion_rate=self.step*factor))
-        #print(self.step*factor)
 
     def draw_map(self, mesh: Mesh):
 
