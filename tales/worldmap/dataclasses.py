@@ -39,15 +39,16 @@ class MapParameters:
             (2, 10): "Heavy smoothing, tiles are almost of the same size"
         }
     })
-    number_mountains: int = field(default=50, metadata={
+    number_hills: int = field(default=80, metadata={
         "description": "Higher numbers create a more 'spotty' land area, at ~50 will often create inland seas",
         "ranges": {
             (0, 7): "Little inland seas, area mainly defined via rifts",
             (7, 30): "Smaller inland seas and smaller islands",
-            (30, 70): "Multiple large inland seas and island chains"
+            (30, 70): "Multiple large inland seas and island chains",
+            (70, 150): "Lots of hilly terrain"
         }
     })
-    number_rifts: int = field(default=5, metadata={
+    number_rifts: int = field(default=1, metadata={
         "description": "Higher numbers create a smoother side-to-side elevation profile, and less spots in the middle",
         "ranges": {
             (0, 5): "little end-to-end elevation shift, more inland seas and rugged coasts",
@@ -69,5 +70,13 @@ class MapParameters:
             (0, 1): "Little cleaning, might have small spikes at the coast",
             (1, 4): "Normal cleaning, most spikes and tiny islands are removed",
             (4, 10): "High cleaning, should rarely result in any changes from normal cleaning"
+        }
+    })
+    percent_sea: int = field(default=30, metadata={
+        "description": "Higher numbers create a higher sealevel, values are from 0 to 100",
+        "ranges": {
+            (0, 30): "Low sea level",
+            (30, 60): "Normal sea level",
+            (50, 80): "High sea level, majority of map is sea"
         }
     })

@@ -27,21 +27,15 @@ class Elevator:
 
         elevation = Elevator._create_baseline_elevation(vertice_noise, verts, num_verts)
 
-        # this doesn't seem to be doing much
-        elevation = Elevator._create_mountains(elevation, verts, params)
+        elevation = Elevator._create_hills(elevation, verts, params)
 
         elevation = Elevator._create_rifting(elevation, adj, vertice_noise, num_verts, params)
         elevation = Elevator._soften_elevation(elevation, params)
 
-        raise_amount = np.random.randint(20, 40)
-        elevation = Elevator._raise_sealevel(elevation, raise_amount)
-
         erodability = Elevator._create_erodability(vertice_noise)
         elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, 1, 0.025)
 
-        raise_amount = np.random.randint(raise_amount, raise_amount + 20)
-        elevation = Elevator._raise_sealevel(elevation, raise_amount)
-
+        elevation = Elevator._raise_sealevel(elevation, params.percent_sea)
         elevation = Elevator._clean_coast(elevation, adj, num_verts, params)
 
         downhill = Elevator._calc_downhill(elevation, adj, num_verts)
@@ -78,9 +72,7 @@ class Elevator:
     def _create_baseline_elevation(vertice_noise: ndarr, verts: ndarr, num_verts: int) -> ndarr:
         """Creates a baseline elevation based on the randomized vertice noise"""
         elevation = np.zeros(num_verts + 1)
-        elevation[:-1] = 0.5 + (
-                (vertice_noise - 0.5) * np.random.normal(0, 4, (1, 2))
-        ).sum(1)
+        elevation[:-1] = 0.5 + ((vertice_noise - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
         elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(verts, 0.5)
         return elevation
 
@@ -94,12 +86,12 @@ class Elevator:
         return erodability
 
     @staticmethod
-    def _create_mountains(elevation: ndarr, verts: ndarr, params: MapParameters) -> ndarr:
-        """Creates elevated "spots" of land that will be harder to erode"""
+    def _create_hills(elevation: ndarr, verts: ndarr, params: MapParameters) -> ndarr:
+        """Creates elevated "spots" of land that will be harder to erode and may form mountains/islands"""
         elevation = elevation.copy()
-        mountains = np.random.random((params.number_mountains, 2))
-        for m in mountains:
-            elevation[:-1] += np.exp(-distance(verts, m) ** 2 / 0.005) ** 2
+        hills = np.random.random((params.number_hills, 2))
+        for hill_position in hills:
+            elevation[:-1] += np.exp(-distance(verts, hill_position) ** 2 / 0.005) ** 2
         return elevation
 
     @staticmethod
@@ -149,6 +141,8 @@ class Elevator:
 
     @staticmethod
     def _raise_sealevel(elevation: ndarr, amount_percent: int) -> ndarr:
+        """ Moves amount_percent of points under water, then scales everything up to the old max vals again
+        """
         assert 0 <= amount_percent <= 100
         elevation = elevation.copy()
         maxheight = elevation.max()

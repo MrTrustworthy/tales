@@ -52,8 +52,10 @@ class MapDrawingSystem(System):
         mesh = map.mesh_gen.mesh
         self.draw_map(mesh)
 
-        #map.mesh_gen.update_params(MapParameters(coast_cleaning=self.step))
-        #print(self.step)
+
+
+        #map.mesh_gen.update_params(MapParameters(percent_sea=self.step * 5))
+        #print(self.step * 5)
 
     def draw_map(self, mesh: Mesh):
 
@@ -62,16 +64,10 @@ class MapDrawingSystem(System):
             region = mesh.v_regions[i]
             vertices = mesh.v_vertices
 
-            vertice_indicies = [
-                region_vertex_idx
-                for region_vertex_idx in region
-                if region_vertex_idx != -1
-            ]
+            vertice_indicies = [vertex_idx for vertex_idx in region if vertex_idx != -1]
             verts = np.array([vertices[rvi] for rvi in vertice_indicies])
 
-            drawable_poly = np.concatenate(
-                [center, verts.flatten(), verts.flatten()[:2]]
-            )
+            drawable_poly = np.concatenate([center, verts.flatten(), verts.flatten()[:2]])
             amount = len(drawable_poly) // 2
 
             # assemble colors based on the elevation of the vertices we draw
