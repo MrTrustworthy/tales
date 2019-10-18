@@ -27,12 +27,13 @@ class MapParameters:
     number_points: int = 1024
     seed: int = 23
     point_smoothing: int = 2  # moves center points away from each other. decreasing effectiveness above ~4
+    number_mountains: int = 5  # 80  # higher numbers create a more "spotty" land area
+    number_rifts: int = 10  # higher numbers create a smoother side-to-side elevation profile, and less middle spots
 
 
 class MeshGenerator:
 
     def __init__(self, map_params: MapParameters):
-
         self.map_params = map_params
 
         self.mesh: Optional[Mesh] = None
@@ -41,7 +42,7 @@ class MeshGenerator:
     def build_mesh(self) -> "Mesh":
         np.random.seed(self.map_params.seed)
         self.mesh = Mesh(self.map_params)
-        self.elevator = Elevator(self.mesh)
+        self.elevator = Elevator(self.mesh, self.map_params)
         self.elevator.generate_heightmap()
         self.update_elevation()
         return self.mesh
@@ -85,7 +86,7 @@ class Mesh:
         # all the vertices we need, aka the points that separate one region (based on center points) from others
         self.v_vertices = self._remove_outliers(self.vor.vertices)
 
-        self.v_distorted_vertices = self._distorted_vertices(self.v_vertices)
+        self.v_vertice_noise = self._vertice_noise(self.v_vertices)
 
         self.elevation: Optional[ndarr] = None
 
@@ -165,24 +166,22 @@ class Mesh:
                 edges[vertex_idx] = True
         return edges
 
-    def _distorted_vertices(self, vertices: ndarr) -> ndarr:
+    def _vertice_noise(self, vertices: ndarr) -> ndarr:
         assert vertices.shape[1] == 2
-
-        distorted_vertices = self.v_vertices.copy()
-
+        vertice_noise = self.v_vertices.copy()
         # perlin noise on vertices
         base = np.random.randint(1000)
         noises = np.array([noise.pnoise2(x, y, lacunarity=1.7, octaves=3, base=base) for x, y in vertices])
-
-        distorted_vertices[:, 0] += noises
-        distorted_vertices[:, 1] += noises
-        return distorted_vertices
+        vertice_noise[:, 0] += noises
+        vertice_noise[:, 1] += noises
+        return vertice_noise
 
 
 class Elevator:
 
-    def __init__(self, mesh: Mesh):
+    def __init__(self, mesh: Mesh, map_params: MapParameters):
         self.mesh = mesh
+        self.map_params = map_params
 
         self.elevation: Optional[ndarr] = None
         self.erodability: Optional[ndarr] = None
@@ -191,37 +190,27 @@ class Elevator:
         num_verts = self.mesh.v_number_vertices
         num_points = self.mesh.number_points
         adj = self.mesh.v_adjacencies
-        distortions = self.mesh.v_distorted_vertices
+        vertice_noise = self.mesh.v_vertice_noise
         verts = self.mesh.v_vertices
         regions = self.mesh.v_regions
+        params = self.map_params
 
-        elevation = np.zeros(num_verts + 1)
-        elevation[:-1] = 0.5 + ((distortions - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
-        elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(verts, 0.5)
+        elevation = Elevator._create_baseline_elevation(vertice_noise, verts, num_verts)
 
         # this doesn't seem to be doing much
-        mountains = np.random.random((5, 2))
-        for m in mountains:
-            elevation[:-1] += np.exp(-distance(verts, m) ** 2 / 0.005) ** 2
+        elevation = Elevator._create_mountains(elevation, verts, params)
 
-        zero_mean_distortions = distortions - distortions.mean()
-        random_1_2 = np.random.normal(0, 2, (1, 2))
-        random_scalar = np.random.normal(0, 0.5)
-        along = ((zero_mean_distortions * random_1_2).sum(1) + random_scalar) * 10
-        erodability = np.exp(4 * np.arctan(along))
-
-        for i in range(5):
-            elevation = Elevator._create_rift(elevation, distortions)
-            elevation = Elevator._relax(elevation, adj, num_verts)
-        for i in range(5):
-            elevation = Elevator._relax(elevation, adj, num_verts)
-        elevation = Elevator._soften_elevation(elevation)
+        elevation = Elevator._create_rifting(elevation, adj, vertice_noise, num_verts, params)
 
         raise_amount = np.random.randint(20, 40)
         elevation = Elevator._raise_sealevel(elevation, raise_amount)
-        elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, 1,
-                                    0.025)
-        elevation = Elevator._raise_sealevel(elevation, np.random.randint(raise_amount, raise_amount + 20))
+
+        erodability = Elevator._create_erodability(vertice_noise)
+        elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, 1, 0.025)
+
+        raise_amount = np.random.randint(raise_amount, raise_amount + 20)
+        elevation = Elevator._raise_sealevel(elevation, raise_amount)
+
         elevation = Elevator._clean_coast(elevation, adj, num_verts, 3, True)
 
         downhill = Elevator._calc_downhill(elevation, adj, num_verts)
@@ -235,8 +224,66 @@ class Elevator:
         return elevation
 
     @staticmethod
-    def _create_rift(elevation: ndarr, distortions: ndarr) -> ndarr:
-        side = 5 * (distance(distortions, 0.5) ** 2 - 1)
+    def _erode(
+            elevation: ndarr, erodability: ndarr,
+            adj: Adjacency, verts: ndarr, num_verts: int,
+            iterations: int, rate: float) -> ndarr:
+        """ Removes landmass next to water
+
+        Smaller rates lead to "thinner" erosion lines (river beds, ...)
+        """
+        assert iterations > 0, "Need at least 1 iteration of erosion"
+        elevation = elevation.copy()
+        for _ in range(iterations):
+            downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+            flow = Elevator._calc_flow(elevation, downhill, num_verts)
+            slopes = Elevator._calc_slopes(elevation, downhill, verts)
+            elevation = Elevator._erode_step(elevation, erodability, flow, slopes, rate)
+            elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
+            elevation[-1] = 0
+        return elevation
+
+    @staticmethod
+    def _create_baseline_elevation(vertice_noise: ndarr, verts: ndarr, num_verts: int) -> ndarr:
+        """Creates a baseline elevation based on the randomized vertice noise"""
+        elevation = np.zeros(num_verts + 1)
+        elevation[:-1] = 0.5 + ((vertice_noise - 0.5) * np.random.normal(0, 4, (1, 2))).sum(1)
+        elevation[:-1] += -4 * (np.random.random() - 0.5) * distance(verts, 0.5)
+        return elevation
+
+    @staticmethod
+    def _create_erodability(vertice_noise: ndarr) -> ndarr:
+        zero_mean_vertice_noise = vertice_noise - vertice_noise.mean()
+        random_1_2 = np.random.normal(0, 2, (1, 2))
+        random_scalar = np.random.normal(0, 0.5)
+        along = ((zero_mean_vertice_noise * random_1_2).sum(1) + random_scalar) * 10
+        erodability = np.exp(4 * np.arctan(along))
+        return erodability
+
+    @staticmethod
+    def _create_mountains(elevation: ndarr, verts: ndarr, params: MapParameters) -> ndarr:
+        """Creates elevated "spots" of land that will be harder to erode"""
+        elevation = elevation.copy()
+        mountains = np.random.random((params.number_mountains, 2))
+        for m in mountains:
+            elevation[:-1] += np.exp(-distance(verts, m) ** 2 / 0.005) ** 2
+        return elevation
+
+    @staticmethod
+    def _create_rifting(
+            elevation: ndarr, adj: Adjacency, vertice_noise: ndarr, num_verts: int, params: MapParameters
+    ) -> ndarr:
+        for i in range(params.number_rifts):
+            elevation = Elevator._create_rift(elevation, vertice_noise)
+            elevation = Elevator._relax(elevation, adj, num_verts)
+        elevation = Elevator._relax(elevation, adj, num_verts)
+        elevation = Elevator._soften_elevation(elevation)
+        return elevation
+
+    @staticmethod
+    def _create_rift(elevation: ndarr, vertice_noise: ndarr) -> ndarr:
+        elevation = elevation.copy()
+        side = 5 * (distance(vertice_noise, 0.5) ** 2 - 1)
         value = np.random.normal(0, 0.3)
         elevation[:-1] += np.arctan(side) * value
         return elevation
@@ -246,7 +293,7 @@ class Elevator:
         """Modifies neighboring elevation vertices to be closer in height, smoothing heightmap
         """
         elevation = elevation.copy()
-        newelev = np.zeros_like(elevation[:-1])  # can't i just make elevation have one vertice less???
+        newelev = np.zeros_like(elevation[:-1])
         for u in range(num_verts):
             adjs = [v for v in adj.adjacent_vertices[u] if v != -1]
             if len(adjs) < 2:
@@ -303,26 +350,6 @@ class Elevator:
         return elevation
 
     # EROSION
-    @staticmethod
-    def _erode(
-            elevation: ndarr, erodability: ndarr,
-            adj: Adjacency, verts: ndarr, num_verts: int,
-            iterations: int, rate: float) -> ndarr:
-        """ Removes landmass next to water
-
-        Smaller rates lead to "thinner" erosion lines (river beds, ...)
-        """
-        assert iterations > 0, "Need at least 1 iteration of erosion"
-        elevation = elevation.copy()
-        for _ in range(iterations):
-            downhill = Elevator._calc_downhill(elevation, adj, num_verts)
-            flow = Elevator._calc_flow(elevation, downhill, num_verts)
-            slopes = Elevator._calc_slopes(elevation, downhill, verts)
-            elevation = Elevator._erode_step(elevation, erodability, flow, slopes, rate)
-            elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
-            elevation[-1] = 0
-        return elevation
-
     @staticmethod
     def _calc_downhill(elevation: ndarr, adjacency: Adjacency, num_verts: int) -> ndarr:
         """Calculates a "downhill" array
