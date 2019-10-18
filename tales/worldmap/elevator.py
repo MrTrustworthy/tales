@@ -30,9 +30,8 @@ class Elevator:
         # this doesn't seem to be doing much
         elevation = Elevator._create_mountains(elevation, verts, params)
 
-        elevation = Elevator._create_rifting(
-            elevation, adj, vertice_noise, num_verts, params
-        )
+        elevation = Elevator._create_rifting(elevation, adj, vertice_noise, num_verts, params)
+        elevation = Elevator._soften_elevation(elevation, params)
 
         raise_amount = np.random.randint(20, 40)
         elevation = Elevator._raise_sealevel(elevation, raise_amount)
@@ -111,7 +110,6 @@ class Elevator:
             elevation = Elevator._create_rift(elevation, vertice_noise)
             elevation = Elevator._relax(elevation, adj, num_verts)
         elevation = Elevator._relax(elevation, adj, num_verts)
-        elevation = Elevator._soften_elevation(elevation)
         return elevation
 
     @staticmethod
@@ -137,16 +135,16 @@ class Elevator:
         return elevation
 
     @staticmethod
-    def _soften_elevation(elevation: ndarr) -> ndarr:
+    def _soften_elevation(elevation: ndarr, params: MapParameters) -> ndarr:
         """ Soft-normalizes elevation
 
         Elevation will be normalized to a range between 0 and 1,
-        with values being scaled to be closer to 1 via sqrt(normalized_val)
+        with values being scaled to be closer to 1 via sqrt(normalized_val) at
         """
         # noinspection PyArgumentList
         elevation = (elevation - elevation.min()) / (elevation.max() - elevation.min())
         assert 1 >= elevation.max() and elevation.min() >= 0
-        elevation **= 0.5
+        elevation **= params.elevation_softness
         return elevation
 
     @staticmethod

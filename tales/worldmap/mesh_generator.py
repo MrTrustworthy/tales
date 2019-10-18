@@ -12,14 +12,15 @@ class MeshGenerator:
 
         self.mesh: Optional[Mesh] = None
         self.elevator: Optional[Elevator] = None
+        self.build_mesh()
 
     def build_mesh(self) -> "Mesh":
         np.random.seed(self.map_params.seed)
         self.mesh = Mesh(self.map_params)
         self.elevator = Elevator(self.mesh, self.map_params)
         self.elevator.generate_heightmap()
-        self.update_elevation()
-        return self.mesh
-
-    def update_elevation(self):
         self.mesh.elevation = self.elevator.elevation
+
+    def update_params(self, map_params: MapParameters):
+        self.map_params = map_params
+        self.build_mesh()

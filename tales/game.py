@@ -5,7 +5,7 @@ from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems import UnitDrawingSystem, MovementSystem, CollisionSystem
 from tales.systems.system import SystemType
-from tales.systems.worldmap import MapDrawingSystem
+from tales.systems.map_drawing import MapDrawingSystem
 from tales.world import World
 
 

@@ -5,6 +5,7 @@ from typing import Tuple
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
+from tales.worldmap.dataclasses import MapParameters
 from tales.worldmap.mesh import Mesh
 
 
@@ -48,10 +49,13 @@ class MapDrawingSystem(System):
     def update(self, entity: Entity, *args, **kwargs):
         self.step += 1
         map = entity.get_component_by_class(WorldMap)
-        mesh = map.mesh
+        mesh = map.mesh_gen.mesh
         # mesh.elevation = mesh.erode(mesh.elevation, mesh.erodability, 10, 0.01)
 
         self.draw_map(mesh)
+
+        #map.mesh_gen.update_params(MapParameters(elevation_softness=self.step/5))
+        #print(self.step/5)
 
     def draw_map(self, mesh: Mesh):
 
@@ -74,9 +78,7 @@ class MapDrawingSystem(System):
 
             # assemble colors based on the elevation of the vertices we draw
             color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
-            mean = [
-                np.median(color_numbers)
-            ]  # use the median as an approximation of the center
+            mean = [np.median(color_numbers)]  # use the median as an approximation of the center
 
             color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
