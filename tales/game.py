@@ -1,4 +1,5 @@
 import pyglet
+from pyglet.gl import *
 
 from tales.components import Drawable, Position, Collider, Movement
 from tales.components.worldmap import WorldMap
@@ -48,6 +49,10 @@ class Game:
         self.window_size = (1920, 1080)
         self.fps = 60  # setting it over 60 seems to have no effect - is refresh rate considered in clock.schedule?
         self.window = pyglet.window.Window(width=self.window_size[0], height=self.window_size[1], caption="Tales")
+
+        # we need that so that the ALPHA channel of images is blitted as transparency
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def run(self):
         world = make_world()

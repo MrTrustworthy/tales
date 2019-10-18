@@ -15,6 +15,7 @@ class Elevator:
 
         self.elevation: Optional[ndarr] = None
         self.erodability: Optional[ndarr] = None
+        self.cities: Optional[ndarr] = None
 
     def generate_heightmap(self):
         num_verts = self.mesh.v_number_vertices
@@ -45,12 +46,14 @@ class Elevator:
         slopes = Elevator._calc_slopes(elevation, downhill, verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
-        cities = Elevator._place_cities(10, elevation, verts, flow)
+        cities = Elevator._place_cities(10, elevation, verts, flow, params)
 
         self.elevation, self.erodability, self.cities = elevation, erodability, cities
 
     @staticmethod
-    def _place_cities(num_cities: int, elevation: ndarr, verts: ndarr, flow: ndarr):
+    def _place_cities(
+            num_cities: int, elevation: ndarr, verts: ndarr, flow: ndarr, params: MapParameters
+    ) -> List[ndarr]:
         city_score = flow ** 0.5
         city_score[elevation[:-1] <= 0] = -9999999
         cities = []
@@ -60,7 +63,7 @@ class Elevator:
                     0.1 < verts[newcity, 0] < 0.9 and \
                     0.1 < verts[newcity, 1] < 0.9:
                 cities.append(newcity)
-            city_score -= 0.01 * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
+            city_score -= params.city_spacing * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
         return cities
 
     @staticmethod
@@ -219,10 +222,11 @@ class Elevator:
     @staticmethod
     def _calc_flow(elevation: ndarr, downhill: ndarr, num_verts: int) -> ndarr:
         rain = np.ones(num_verts) / num_verts
-        i = downhill[downhill != -1]
+        is_downhill = downhill[downhill != -1]
         j = np.arange(num_verts)[downhill != -1]
-        dmat = (sparse.eye(num_verts) - sparse.coo_matrix((np.ones_like(i), (i, j)), (num_verts, num_verts)).tocsc())
-        flow = linalg.spsolve(dmat, rain)
+        dense_matrix = (sparse.eye(num_verts) - sparse.coo_matrix((np.ones_like(is_downhill), (is_downhill, j)),
+                                                                  (num_verts, num_verts)).tocsc())
+        flow = linalg.spsolve(dense_matrix, rain)
         flow[elevation[:-1] <= 0] = 0
         return flow
 
@@ -281,9 +285,7 @@ class Elevator:
     def _get_lowest_sill(elevation: ndarr, sinks: ndarr, adjacency: Adjacency) -> Tuple[float, int, int]:
 
         height = 10000
-        maps = np.any(
-            (sinks[adjacency.adjacency_map] == -1) & adjacency.adjacency_map != -1, 1
-        )
+        maps = np.any((sinks[adjacency.adjacency_map] == -1) & adjacency.adjacency_map != -1, 1)
         edges = np.where((sinks != -1) & maps)[0]
 
         best_edge_corner = 0, 0

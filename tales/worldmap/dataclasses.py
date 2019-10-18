@@ -80,7 +80,7 @@ class MapParameters:
             (50, 80): "High sea level, majority of map is sea"
         }
     })
-    erosion_iterations: int = field(default=50, metadata={
+    erosion_iterations: int = field(default=5, metadata={  # default of 50 is good, but too expensive while developing
         "description": "Higher numbers lead to a more line-y elevation pattern with deltas and mountain passes",
         "ranges": {
             (0, 30): "Low erosion impact, very little visible erosion lines",
@@ -95,5 +95,13 @@ class MapParameters:
             (0.01, 0.1): "Low erosion rate, thin erosion lines are visible and get larger with increasing rate",
             (0.1, 1): "Normal erosion rate, pronounced erosion lines visible in sea and land",
             (2, 5): "High erosion rate, lots of small artefacts and tiny islands"
+        }
+    })
+    city_spacing: float = field(default=0.1, metadata={
+        "description": "Higher numbers forces cities to spawn further away from each other",
+        "ranges": {
+            (0.0, 0.02): "Low spacing, cities might be spread along a single river",
+            (0.02, 0.1): "Medium spacing, some cities might be close together but clusters are spread",
+            (0.1, 0.6): "High spread, cities will attempt to spawn as far away from each other as possible",
         }
     })

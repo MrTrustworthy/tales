@@ -1,12 +1,18 @@
 import numpy as np
 import pyglet
+from pyglet.gl import *
 from typing import Tuple
 
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
 from tales.systems.system import System, SystemType
+from tales.worldmap.dataclasses import MapParameters
 from tales.worldmap.mesh import Mesh
 from tales.worldmap.mesh_generator import MeshGenerator
+
+CITY_IMAGE = pyglet.resource.image(f"resources/castle.png")
+CITY_IMAGE.anchor_x = CITY_IMAGE.width // 2
+CITY_IMAGE.anchor_y = CITY_IMAGE.height // 2
 
 
 def _col_from_number(number):
@@ -53,6 +59,11 @@ class MapDrawingSystem(System):
         self.draw_centers(map.mesh_gen.mesh)
         self.draw_cities(map.mesh_gen)
 
+        # factor = 0.1
+        # property = "city_spacing"
+        # map.mesh_gen.update_params(MapParameters(**{property: factor * self.step}))
+        # print(factor * self.step)
+
     def draw_map(self, mesh: Mesh):
 
         for i, center in enumerate(mesh.center_points):
@@ -83,14 +94,9 @@ class MapDrawingSystem(System):
         if not self.cities:
             return
         draw_points = np.array([mesh_gen.mesh.v_vertices[i] for i in mesh_gen.elevator.cities])
-        draw_points = draw_points.flatten() * self.draw_scale + 100
-        point_amount = len(draw_points) // 2
-        pyglet.graphics.draw(
-            point_amount,
-            pyglet.gl.GL_POINTS,
-            ("v2f", draw_points),
-            ("c3B", (255, 0, 0) * point_amount),
-        )
+
+        for x, y in draw_points * self.draw_scale + 100:
+            CITY_IMAGE.blit(x, y)
 
     def draw_centers(self, mesh: Mesh):
         if not self.centers:
