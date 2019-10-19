@@ -55,16 +55,17 @@ class MapDrawingSystem(System):
     def update(self, entity: Entity, *args, **kwargs):
         self.step += 1
         map = entity.get_component_by_class(WorldMap)
-        self.draw_map(map.mesh_gen.mesh)
+        self.draw_map(map.mesh_gen)
         self.draw_centers(map.mesh_gen.mesh)
         self.draw_cities(map.mesh_gen)
 
-        # factor = 0.1
-        # property = "city_spacing"
+        # factor = 1
+        # property = "number_cities"
         # map.mesh_gen.update_params(MapParameters(**{property: factor * self.step}))
         # print(factor * self.step)
 
-    def draw_map(self, mesh: Mesh):
+    def draw_map(self, mesh_gen: MeshGenerator):
+        mesh = mesh_gen.mesh
 
         for i, center in enumerate(mesh.center_points):
             # take the center point and all the vertices that define that points' "region"
@@ -79,9 +80,9 @@ class MapDrawingSystem(System):
 
             # assemble colors based on the elevation of the vertices we draw
             color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
-            mean = [np.median(color_numbers)]  # use the median as an approximation of the center
+            center_color_num = [mesh_gen.elevator.elevation_pts[i]]
 
-            color_numbers = np.concatenate([mean, color_numbers, [color_numbers[0]]])
+            color_numbers = np.concatenate([center_color_num, color_numbers, [color_numbers[0]]])
             colors = np.array([col_from_number(cnn) for cnn in color_numbers]).flatten()
 
             pyglet.graphics.vertex_list(

@@ -28,7 +28,7 @@ class MapParameters:
             (4096, 8192): "Large sized map"
         }
     })
-    seed: int = field(default=12, metadata={
+    seed: int = field(default=49, metadata={
         "description": "Random seed that makes map generation reproducible",
     })
     point_smoothing: int = field(default=2, metadata={
@@ -97,11 +97,19 @@ class MapParameters:
             (2, 5): "High erosion rate, lots of small artefacts and tiny islands"
         }
     })
-    city_spacing: float = field(default=0.1, metadata={
+    number_cities: int = field(default=1, metadata={
+        "description": "Number of cities to spawn",
+        "ranges": {
+            (0, 10): "Low amount of cities",
+            (10, 20): "Normal amount of cities",
+            (20, 100): "Lots of cities",
+        }
+    })
+    city_spacing: float = field(default=1, metadata={
         "description": "Higher numbers forces cities to spawn further away from each other",
         "ranges": {
             (0.0, 0.02): "Low spacing, cities might be spread along a single river",
-            (0.02, 0.1): "Medium spacing, some cities might be close together but clusters are spread",
-            (0.1, 0.6): "High spread, cities will attempt to spawn as far away from each other as possible",
+            (0.02, 0.6): "Medium spacing, some cities might be close together but clusters are spread",
+            (0.6, 10): "High spread, cities will attempt to spawn as far away from each other as possible",
         }
     })

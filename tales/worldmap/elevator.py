@@ -13,9 +13,17 @@ class Elevator:
         self.mesh = mesh
         self.map_params = map_params
 
+        # elevation on index i is the elevation of v_vertices[i]
         self.elevation: Optional[ndarr] = None
+
+        # TODO
         self.erodability: Optional[ndarr] = None
+
+        # city locations given as indicies into v_vertices
         self.cities: Optional[ndarr] = None
+
+        # elevation_pts on index i is the elevation of center_points[i]
+        self.elevation_pts: Optional[ndarr] = None
 
     def generate_heightmap(self):
         num_verts = self.mesh.v_number_vertices
@@ -43,12 +51,11 @@ class Elevator:
         elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
         downhill = Elevator._calc_downhill(elevation, adj, num_verts)
         flow = Elevator._calc_flow(elevation, downhill, num_verts)
-        slopes = Elevator._calc_slopes(elevation, downhill, verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
-        cities = Elevator._place_cities(10, elevation, verts, flow, params)
+        cities = Elevator._place_cities(params.number_cities, elevation, verts, flow, params)
 
-        self.elevation, self.erodability, self.cities = elevation, erodability, cities
+        self.elevation, self.elevation_pts, self.erodability, self.cities = elevation, elevation_pts, erodability, cities
 
     @staticmethod
     def _place_cities(
