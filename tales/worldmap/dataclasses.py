@@ -97,7 +97,7 @@ class MapParameters:
             (2, 5): "High erosion rate, lots of small artefacts and tiny islands"
         }
     })
-    number_cities: int = field(default=1, metadata={
+    number_cities: int = field(default=15, metadata={
         "description": "Number of cities to spawn",
         "ranges": {
             (0, 10): "Low amount of cities",

@@ -1,7 +1,7 @@
 import numpy as np
 import pyglet
 from pyglet.gl import *
-from typing import Tuple
+from typing import Tuple, List, Dict, Optional
 
 from tales.components.worldmap import WorldMap
 from tales.entities.entity import Entity
@@ -58,6 +58,7 @@ class MapDrawingSystem(System):
         self.draw_map(map.mesh_gen)
         self.draw_centers(map.mesh_gen.mesh)
         self.draw_cities(map.mesh_gen)
+        self.draw_rivers(map.mesh_gen)
 
         # factor = 1
         # property = "number_cities"
@@ -90,6 +91,67 @@ class MapDrawingSystem(System):
                 ("v2f/static", drawable_poly * self.draw_scale + 100),
                 ("c3B/static", colors),
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
+
+    def draw_rivers(self, mesh_gen: MeshGenerator):
+        elev = mesh_gen.elevator
+
+        def get_neighbor_with_highest_flow(idx: int, exclude: List[int]) -> Optional[int]:
+            adjacent = mesh_gen.mesh.v_adjacencies.adjacent_vertices[idx]
+            idx_flow_tuples = [(i, elev.flow[i]) for i in adjacent if i not in exclude]
+            if len(idx_flow_tuples) == 0:
+                return None
+            sorted_tuples = sorted(idx_flow_tuples, key=lambda kv: kv[1], reverse=True)
+            return sorted_tuples[0][0]  # index of highest flow neighbor
+
+        highest_indicies = np.argsort(elev.flow)[::-1]
+
+        num_rivers = 25
+        rivers = []
+
+        already_river = lambda i: i in (r for ri in rivers for r in ri)
+
+        for i in highest_indicies:
+            current = i
+
+            if already_river(i):
+                continue
+
+            river = [current]
+            while True:
+                highest_neighbor = get_neighbor_with_highest_flow(current, river)
+
+                # if there's no free neighbor, then stop there
+                if highest_neighbor is None:
+                    break
+
+                river.append(current)
+
+                # once river flows into the ocean, stop
+                if mesh_gen.mesh.elevation[highest_neighbor] <= 0:
+                    break
+
+                if already_river(highest_neighbor):
+                    break
+
+                current = highest_neighbor
+
+            rivers.append(river)
+            print("Adding river with length", len(river), "avg", np.array([elev.flow[i] for i in river]).mean())
+            if len(rivers) >= num_rivers:
+                break
+
+        for i, river in enumerate(rivers):
+            river_verts = np.array([mesh_gen.mesh.v_vertices[r_idx] for r_idx in river]).flatten()
+            amount = len(river_verts) // 2
+            pyglet.gl.glLineWidth(3)
+            pyglet.graphics.vertex_list(
+                amount,
+                ("v2f/static", river_verts * self.draw_scale + 100),
+                ("c3B/static", ((255 // num_rivers) * i,) * 3 * amount),
+            ).draw(pyglet.gl.GL_LINE_STRIP)
+
+        import pdb
+        # pdb.set_trace()
 
     def draw_cities(self, mesh_gen: MeshGenerator):
         if not self.cities:

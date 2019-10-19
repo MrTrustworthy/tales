@@ -754,8 +754,7 @@ class MapGrid(object):
             land = good & (self.elevation[:-1] > 0) & (self.downhill != -1) & \
                    (self.flow > np.percentile(self.flow, 100 - self.riverperc))
             rivers = relaxpts(self.vxs, [(u, self.downhill[u]) for u in xrange(self.nvxs) if land[u]])
-            print
-            len(rivers), sum(land)
+
             rivers = mergelines(rivers)
             rivercol = mpl.collections.PathCollection(rivers)
             rivercol.set_edgecolor('black')

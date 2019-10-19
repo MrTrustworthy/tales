@@ -25,6 +25,11 @@ class Elevator:
         # elevation_pts on index i is the elevation of center_points[i]
         self.elevation_pts: Optional[ndarr] = None
 
+        self.flow: Optional[ndarr] = None
+
+        # downhill on index i is the index of the lowest neighbour according to elevation
+        self.downhill: Optional[ndarr] = None
+
     def generate_heightmap(self):
         num_verts = self.mesh.v_number_vertices
         num_points = self.mesh.number_points
@@ -55,7 +60,11 @@ class Elevator:
 
         cities = Elevator._place_cities(params.number_cities, elevation, verts, flow, params)
 
-        self.elevation, self.elevation_pts, self.erodability, self.cities = elevation, elevation_pts, erodability, cities
+        self.elevation, self.elevation_pts, self.erodability, self.cities, self.flow, self.downhill = \
+            elevation, elevation_pts, erodability, cities, flow, downhill
+
+
+
 
     @staticmethod
     def _place_cities(
