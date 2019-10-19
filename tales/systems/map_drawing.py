@@ -60,6 +60,8 @@ class MapDrawingSystem(System):
         self.draw_cities(map.mesh_gen)
         self.draw_rivers(map.mesh_gen)
 
+        #self._draw_attribute(map.mesh_gen, "flow")
+
         # factor = 1
         # property = "number_cities"
         # map.mesh_gen.update_params(MapParameters(**{property: factor * self.step}))
@@ -103,31 +105,37 @@ class MapDrawingSystem(System):
             sorted_tuples = sorted(idx_flow_tuples, key=lambda kv: kv[1], reverse=True)
             return sorted_tuples[0][0]  # index of highest flow neighbor
 
-        highest_indicies = np.argsort(elev.flow)[::-1]
+        def jget_neighbor_with_highest_flow(idx: int, exclude: List[int]) -> Optional[int]:
+            lowest_neighbour = elev.downhill[idx]
+            return lowest_neighbour if lowest_neighbour != -1 and lowest_neighbour not in exclude else None
+
+        highest_flow_indicies = np.argsort(elev.elevation)[::-1]
 
         num_rivers = 25
         rivers = []
 
         already_river = lambda i: i in (r for ri in rivers for r in ri)
 
-        for i in highest_indicies:
-            current = i
+        for start_idx in highest_flow_indicies:
+            current = start_idx
 
-            if already_river(i):
+            if already_river(start_idx) or elev.elevation[start_idx] <= 0:
                 continue
 
             river = [current]
             while True:
-                highest_neighbor = get_neighbor_with_highest_flow(current, river)
+                highest_neighbor = jget_neighbor_with_highest_flow(current, river)
 
                 # if there's no free neighbor, then stop there
-                if highest_neighbor is None:
+                if highest_neighbor in (None, -1):
+                    print("sink abort")
                     break
 
-                river.append(current)
+                river.append(highest_neighbor)
 
                 # once river flows into the ocean, stop
                 if mesh_gen.mesh.elevation[highest_neighbor] <= 0:
+                    print("elev abort")
                     break
 
                 if already_river(highest_neighbor):
@@ -150,8 +158,24 @@ class MapDrawingSystem(System):
                 ("c3B/static", ((255 // num_rivers) * i,) * 3 * amount),
             ).draw(pyglet.gl.GL_LINE_STRIP)
 
-        import pdb
-        # pdb.set_trace()
+            # pyglet.graphics.vertex_list(
+            #    1,
+            #    ("v2f", river_verts[:2]* self.draw_scale + 100),
+            #    ("c3B", (255, 0, 0)),
+            # ).draw(pyglet.gl.GL_POINTS)
+
+    def _draw_attribute(self, mesh_gen: MeshGenerator, attribute: str):
+        """Draws a certain vertex attribute with redd-ish color"""
+        attr = getattr(mesh_gen.elevator, attribute)
+        values_norm = (attr - attr.min()) / (attr.max() - attr.min())
+        for i, vert in enumerate(mesh_gen.mesh.v_vertices):
+            pyglet.gl.glPointSize(3)
+            pyglet.graphics.draw(
+                1,
+                pyglet.gl.GL_POINTS,
+                ("v2f", vert * self.draw_scale + 100),
+                ("c3B", (int(values_norm[i] * 205) + 49, 0, 0)),
+            )
 
     def draw_cities(self, mesh_gen: MeshGenerator):
         if not self.cities:

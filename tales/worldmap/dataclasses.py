@@ -20,7 +20,7 @@ class Adjacency:
 
 @dataclass(frozen=True)
 class MapParameters:
-    number_points: int = field(default=2048, metadata={
+    number_points: int = field(default=512, metadata={
         "description": "Higher numbers create bigger maps",
         "ranges": {
             (256, 1024): "Small sized map",
@@ -31,7 +31,7 @@ class MapParameters:
     seed: int = field(default=49, metadata={
         "description": "Random seed that makes map generation reproducible",
     })
-    point_smoothing: int = field(default=2, metadata={
+    point_smoothing: int = field(default=3, metadata={
         "description": "Higher numbers move center points away from each other with decreasing effectiveness",
         "ranges": {
             (0, 1): "No smoothing, tiles may be very small or large",
@@ -80,10 +80,10 @@ class MapParameters:
             (50, 80): "High sea level, majority of map is sea"
         }
     })
-    erosion_iterations: int = field(default=5, metadata={  # default of 50 is good, but too expensive while developing
+    erosion_iterations: int = field(default=50, metadata={  # default of 50 is good, but too expensive while developing
         "description": "Higher numbers lead to a more line-y elevation pattern with deltas and mountain passes",
         "ranges": {
-            (0, 30): "Low erosion impact, very little visible erosion lines",
+            (1, 30): "Low erosion impact, very little visible erosion lines",
             (30, 70): "Normal erosion lines, pronounced bays, deltas, half-islands and mountain passes",
             (70, 150): "High erosion level, lots of land and water strings"
         }

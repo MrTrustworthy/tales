@@ -52,6 +52,7 @@ class Game:
 
         # we need that so that the ALPHA channel of images is blitted as transparency
         glEnable(GL_BLEND)
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def run(self):

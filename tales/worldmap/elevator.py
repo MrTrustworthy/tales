@@ -17,7 +17,7 @@ class Elevator:
         self.elevation: Optional[ndarr] = None
 
         # TODO
-        self.erodability: Optional[ndarr] = None
+        self.base_erodability: Optional[ndarr] = None
 
         # city locations given as indicies into v_vertices
         self.cities: Optional[ndarr] = None
@@ -25,9 +25,10 @@ class Elevator:
         # elevation_pts on index i is the elevation of center_points[i]
         self.elevation_pts: Optional[ndarr] = None
 
+        # flow on index i is the cumulative water flow of all flows leading downward to v_vertices[i]
         self.flow: Optional[ndarr] = None
 
-        # downhill on index i is the index of the lowest neighbour according to elevation
+        # downhill on index i is the index of the lowest neighbour of v_vertices[i]
         self.downhill: Optional[ndarr] = None
 
     def generate_heightmap(self):
@@ -39,29 +40,40 @@ class Elevator:
         regions = self.mesh.v_regions
         params = self.map_params
 
+
+        # Outlines
         elevation = Elevator._create_baseline_elevation(vertice_noise, verts, num_verts)
-
         elevation = Elevator._create_hills(elevation, verts, params)
-
         elevation = Elevator._create_rifting(elevation, adj, vertice_noise, num_verts, params)
         elevation = Elevator._soften_elevation(elevation, params)
 
-        erodability = Elevator._create_erodability(vertice_noise)
-        elevation = Elevator._erode(elevation, erodability, adj, verts, num_verts, params)
+        # clear sinks to make water flow possible
+        downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+        elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
 
+        # Erosion
+        base_erodability = Elevator._create_base_erodability(vertice_noise)
+        for _ in range(params.erosion_iterations):
+            downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+            flow = Elevator._calc_flow(elevation, downhill, num_verts)
+            slopes = Elevator._calc_slopes(elevation, downhill, verts)
+            elevation = Elevator._erode_step(elevation, base_erodability, flow, slopes, params.erosion_rate)
+            elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
+            elevation[-1] = 0
+
+        # clean up coaslines
         elevation = Elevator._raise_sealevel(elevation, params.percent_sea)
         elevation = Elevator._clean_coast(elevation, adj, num_verts, params)
 
-        downhill = Elevator._calc_downhill(elevation, adj, num_verts)
-        elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
+        # let's see about that
         downhill = Elevator._calc_downhill(elevation, adj, num_verts)
         flow = Elevator._calc_flow(elevation, downhill, num_verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
         cities = Elevator._place_cities(params.number_cities, elevation, verts, flow, params)
 
-        self.elevation, self.elevation_pts, self.erodability, self.cities, self.flow, self.downhill = \
-            elevation, elevation_pts, erodability, cities, flow, downhill
+        self.elevation, self.elevation_pts, self.base_erodability, self.cities, self.flow, self.downhill = \
+            elevation, elevation_pts, base_erodability, cities, flow, downhill
 
 
 
@@ -82,24 +94,6 @@ class Elevator:
             city_score -= params.city_spacing * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
         return cities
 
-    @staticmethod
-    def _erode(
-            elevation: ndarr, erodability: ndarr, adj: Adjacency,
-            verts: ndarr, num_verts: int, params: MapParameters
-    ) -> ndarr:
-        """ Removes landmass next to water
-
-        Smaller rates lead to "thinner" erosion lines (river beds, ...)
-        """
-        elevation = elevation.copy()
-        for _ in range(params.erosion_iterations):
-            downhill = Elevator._calc_downhill(elevation, adj, num_verts)
-            flow = Elevator._calc_flow(elevation, downhill, num_verts)
-            slopes = Elevator._calc_slopes(elevation, downhill, verts)
-            elevation = Elevator._erode_step(elevation, erodability, flow, slopes, params.erosion_rate)
-            elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
-            elevation[-1] = 0
-        return elevation
 
     @staticmethod
     def _create_baseline_elevation(vertice_noise: ndarr, verts: ndarr, num_verts: int) -> ndarr:
@@ -110,13 +104,13 @@ class Elevator:
         return elevation
 
     @staticmethod
-    def _create_erodability(vertice_noise: ndarr) -> ndarr:
+    def _create_base_erodability(vertice_noise: ndarr) -> ndarr:
         zero_mean_vertice_noise = vertice_noise - vertice_noise.mean()
         random_1_2 = np.random.normal(0, 2, (1, 2))
         random_scalar = np.random.normal(0, 0.5)
         along = ((zero_mean_vertice_noise * random_1_2).sum(1) + random_scalar) * 10
-        erodability = np.exp(4 * np.arctan(along))
-        return erodability
+        base_erodability = np.exp(4 * np.arctan(along))
+        return base_erodability
 
     @staticmethod
     def _create_hills(elevation: ndarr, verts: ndarr, params: MapParameters) -> ndarr:
@@ -254,10 +248,10 @@ class Elevator:
         return slope
 
     @staticmethod
-    def _erode_step(elevation: ndarr, erodability: ndarr, flow: ndarr, slopes: ndarr, erosion_rate: float) -> ndarr:
+    def _erode_step(elevation: ndarr, base_erodability: ndarr, flow: ndarr, slopes: ndarr, erosion_rate: float) -> ndarr:
         elevation = elevation.copy()
         river_rate = -flow ** 0.5 * slopes  # river erosion
-        slope_rate = -slopes ** 2 * erodability  # slope smoothing
+        slope_rate = -slopes ** 2 * base_erodability  # slope smoothing
         combined_rate = 1000 * river_rate + slope_rate
         combined_rate[elevation[:-1] <= 0] = 0
 
@@ -266,23 +260,28 @@ class Elevator:
         return elevation
 
     @staticmethod
-    def _infill(elevation: ndarr, downhill: ndarr, adj: Adjacency, num_verts: int) -> Tuple[ndarr, ndarr]:
+    def _infill(elevation: ndarr, downhill: ndarr, adjacency: Adjacency, num_verts: int) -> Tuple[ndarr, ndarr]:
+        """This function fills in all the sinks
+
+        At the end, from each point, there's a chain of downhill points leading to the edge of the map
+        """
         elevation = elevation.copy()
         while True:
-            sinks = Elevator._get_sinks(elevation, downhill, adj)
+            sinks = Elevator._get_sinks(elevation, downhill, adjacency)
             if np.all(sinks == -1):
                 return elevation, downhill
-            h, u, v = Elevator._get_lowest_sill(elevation, sinks, adj)
-            sink = sinks[u]
-            if downhill[v] != -1:
-                elevation[v] = elevation[downhill[v]] + 1e-5
+            height, edge, neighbour = Elevator._get_lowest_sill(elevation, sinks, adjacency)
+            sink = sinks[edge]
+            if downhill[neighbour] != -1:
+                elevation[neighbour] = elevation[downhill[neighbour]] + 1e-5
             sinkelev = elevation[:-1][sinks == sink]
-            h = np.where(sinkelev < h, h + 1e-3 * (h - sinkelev), sinkelev) + 1e-5
-            elevation[:-1][sinks == sink] = h
-            downhill = Elevator._calc_downhill(elevation, adj, num_verts)
+            height = np.where(sinkelev < height, height + 1e-3 * (height - sinkelev), sinkelev) + 1e-5
+            elevation[:-1][sinks == sink] = height
+            downhill = Elevator._calc_downhill(elevation, adjacency, num_verts)
 
     @staticmethod
     def _get_sinks(elevation: ndarr, downhill: ndarr, adj: Adjacency) -> ndarr:
+        """Sinks are points not at the edges which are lower than all their neighbors"""
         sinks = downhill.copy()
         water = elevation[:-1] <= 0
         sinklist = np.where((sinks == -1) & ~water & ~adj.vertex_is_edge)[0]
@@ -306,19 +305,19 @@ class Elevator:
 
         best_edge_corner = 0, 0
         for edge in edges:
-            adjs = [v for v in adjacency.adjacent_vertices[edge] if v != -1]
-            for adj in adjs:
-                if sinks[adj] != -1:
+            neighbours = [v for v in adjacency.adjacent_vertices[edge] if v != -1]
+            for neighbour in neighbours:
+                if sinks[neighbour] != -1:
                     continue
-                newh = max(elevation[adj], elevation[edge])
+                newh = max(elevation[neighbour], elevation[edge])
                 if newh >= height:
                     continue
                 height = newh
-                best_edge_corner = edge, adj
+                best_edge_corner = edge, neighbour
         assert height < 10000 and best_edge_corner != (0, 0)
-        edge, adj = best_edge_corner
+        edge, neighbour = best_edge_corner
 
-        return height, edge, adj
+        return height, edge, neighbour
 
     @staticmethod
     def _calc_elevation_pts(num_points: int, regions: List[List[int]], elevation: ndarr) -> ndarr:
