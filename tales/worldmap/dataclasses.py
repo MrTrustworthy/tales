@@ -80,6 +80,14 @@ class MapParameters:
             (50, 80): "High sea level, majority of map is sea"
         }
     })
+    number_rivers: int = field(default=30, metadata={
+        "description": "Number of sources of rivers. Higher numbers create more river beginnings",
+        "ranges": {
+            (0, 15): "Few rivers",
+            (15, 40): "Normal amount of rivers",
+            (40, 80): "Lots of rivers"
+        }
+    })
     erosion_iterations: int = field(default=50, metadata={  # default of 50 is good, but too expensive while developing
         "description": "Higher numbers lead to a more line-y elevation pattern with deltas and mountain passes",
         "ranges": {

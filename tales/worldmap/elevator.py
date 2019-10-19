@@ -67,13 +67,16 @@ class Elevator:
         # one last step of sink filling
         elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
 
+        # create the rivers
+        rivers = Elevator._create_rivers(elevation, downhill, params.number_rivers)
+
         # let's see about that
         flow = Elevator._calc_flow(elevation, downhill, num_verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
         cities = Elevator._place_cities(params.number_cities, elevation, verts, flow, params)
-        self.elevation, self.elevation_pts, self.base_erodability, self.cities, self.flow, self.downhill = \
-            elevation, elevation_pts, base_erodability, cities, flow, downhill
+        self.elevation, self.elevation_pts, self.base_erodability, self.cities, self.flow, self.downhill, self.rivers = \
+            elevation, elevation_pts, base_erodability, cities, flow, downhill, rivers
 
     @staticmethod
     def _place_cities(
@@ -88,8 +91,47 @@ class Elevator:
                     0.1 < verts[newcity, 0] < 0.9 and \
                     0.1 < verts[newcity, 1] < 0.9:
                 cities.append(newcity)
-            city_score -= params.city_spacing * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
+            city_score -= params.city_spacing / (distance(verts, verts[newcity, :]) + 1e-9)
         return cities
+
+    @staticmethod
+    def _create_rivers(elevation: ndarr, downhill: ndarr, num_rivers: int) -> List[List[int]]:
+
+        def get_downstream_neighbour(idx: int, exclude: List[int]) -> Optional[int]:
+            lowest_neighbour = downhill[idx]
+            return lowest_neighbour if lowest_neighbour != -1 and lowest_neighbour not in exclude else None
+
+        get_river_starting_points = lambda: np.argsort(elevation)[::-1]
+        is_already_river = lambda i: i in (r for ri in rivers for r in ri)
+        is_below_water = lambda i: elevation[i] <= 0
+
+        rivers = []
+
+        # create all rivers
+        for start_idx in get_river_starting_points():
+            current = start_idx
+
+            if is_already_river(start_idx) or elevation[start_idx] <= 0:
+                continue
+
+            # create a single river
+            river = [current]
+            while True:
+                highest_neighbor = get_downstream_neighbour(current, river)
+                # if there's no free neighbor, then stop there
+                if highest_neighbor in (None, -1):
+                    break
+                river.append(highest_neighbor)
+                # once river flows into the ocean, stop
+                if is_below_water(highest_neighbor) or is_already_river(highest_neighbor):
+                    break
+                current = highest_neighbor
+
+            rivers.append(river)
+            if len(rivers) >= num_rivers:
+                break
+
+        return rivers
 
     @staticmethod
     def _create_baseline_elevation(vertice_noise: ndarr, verts: ndarr, num_verts: int) -> ndarr:

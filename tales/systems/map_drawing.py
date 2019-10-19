@@ -57,15 +57,11 @@ class MapDrawingSystem(System):
         map = entity.get_component_by_class(WorldMap)
         self.draw_map(map.mesh_gen)
         self.draw_centers(map.mesh_gen.mesh)
-        #self.draw_cities(map.mesh_gen)
+        # self.draw_cities(map.mesh_gen)
         self.draw_rivers(map.mesh_gen)
 
         # self._draw_attribute(map.mesh_gen, "flow")
-
-        # factor = 1
-        # property = "number_cities"
-        # map.mesh_gen.update_params(MapParameters(**{property: factor * self.step}))
-        # print(factor * self.step)
+        self._shift_parameter(map.mesh_gen, "number_rivers", 2)
 
     def draw_map(self, mesh_gen: MeshGenerator):
         mesh = mesh_gen.mesh
@@ -95,52 +91,7 @@ class MapDrawingSystem(System):
             ).draw(pyglet.gl.GL_TRIANGLE_FAN)
 
     def draw_rivers(self, mesh_gen: MeshGenerator):
-        elev = mesh_gen.elevator
-
-        def get_neighbor_with_highest_flow(idx: int, exclude: List[int]) -> Optional[int]:
-            adjacent = mesh_gen.mesh.v_adjacencies.adjacent_vertices[idx]
-            idx_flow_tuples = [(i, elev.flow[i]) for i in adjacent if i not in exclude]
-            if len(idx_flow_tuples) == 0:
-                return None
-            sorted_tuples = sorted(idx_flow_tuples, key=lambda kv: kv[1], reverse=True)
-            return sorted_tuples[0][0]  # index of highest flow neighbor
-
-        def jget_neighbor_with_highest_flow(idx: int, exclude: List[int]) -> Optional[int]:
-            lowest_neighbour = elev.downhill[idx]
-            return lowest_neighbour if lowest_neighbour != -1 and lowest_neighbour not in exclude else None
-
-        highest_flow_indicies = np.argsort(elev.elevation)[::-1]
-
-        num_rivers = 25
-        rivers = []
-
-        is_already_river = lambda i: i in (r for ri in rivers for r in ri)
-        is_below_water = lambda i: mesh_gen.mesh.elevation[i] <= 0
-
-        # create all rivers
-        for start_idx in highest_flow_indicies:
-            current = start_idx
-
-            if is_already_river(start_idx) or elev.elevation[start_idx] <= 0:
-                continue
-
-            # create a single river
-            river = [current]
-            while True:
-                highest_neighbor = jget_neighbor_with_highest_flow(current, river)
-                # if there's no free neighbor, then stop there
-                if highest_neighbor in (None, -1):
-                    break
-                river.append(highest_neighbor)
-                # once river flows into the ocean, stop
-                if is_below_water(highest_neighbor) or is_already_river(highest_neighbor):
-                    break
-                current = highest_neighbor
-
-            rivers.append(river)
-            print("Adding river with length", len(river), "avg", np.array([elev.flow[i] for i in river]).mean())
-            if len(rivers) >= num_rivers:
-                break
+        rivers = mesh_gen.elevator.rivers
 
         for i, river in enumerate(rivers):
             river_verts = np.array([mesh_gen.mesh.v_vertices[r_idx] for r_idx in river]).flatten()
@@ -149,27 +100,15 @@ class MapDrawingSystem(System):
             pyglet.graphics.vertex_list(
                 amount,
                 ("v2f/static", river_verts * self.draw_scale + 100),
-                ("c3B/static", ((255 // num_rivers) * i,) * 3 * amount),
+                ("c3B/static", (59, 179, 208) * amount),
             ).draw(pyglet.gl.GL_LINE_STRIP)
 
-            # pyglet.graphics.vertex_list(
-            #    1,
-            #    ("v2f", river_verts[:2]* self.draw_scale + 100),
-            #    ("c3B", (255, 0, 0)),
-            # ).draw(pyglet.gl.GL_POINTS)
-
-    def _draw_attribute(self, mesh_gen: MeshGenerator, attribute: str):
-        """Draws a certain vertex attribute with redd-ish color"""
-        attr = getattr(mesh_gen.elevator, attribute)
-        values_norm = (attr - attr.min()) / (attr.max() - attr.min())
-        for i, vert in enumerate(mesh_gen.mesh.v_vertices):
             pyglet.gl.glPointSize(3)
-            pyglet.graphics.draw(
+            pyglet.graphics.vertex_list(
                 1,
-                pyglet.gl.GL_POINTS,
-                ("v2f", vert * self.draw_scale + 100),
-                ("c3B", (int(values_norm[i] * 205) + 49, 0, 0)),
-            )
+                ("v2f", river_verts[:2] * self.draw_scale + 100),
+                ("c3B", (255, 0, 0)),
+            ).draw(pyglet.gl.GL_POINTS)
 
     def draw_cities(self, mesh_gen: MeshGenerator):
         if not self.cities:
@@ -190,3 +129,20 @@ class MapDrawingSystem(System):
             ("v2f", draw_points),
             ("c3B", (255, 0, 0) * point_amount),
         )
+
+    def _draw_attribute(self, mesh_gen: MeshGenerator, attribute: str):
+        """Draws a certain vertex attribute with redd-ish color"""
+        attr = getattr(mesh_gen.elevator, attribute)
+        values_norm = (attr - attr.min()) / (attr.max() - attr.min())
+        for i, vert in enumerate(mesh_gen.mesh.v_vertices):
+            pyglet.gl.glPointSize(3)
+            pyglet.graphics.draw(
+                1,
+                pyglet.gl.GL_POINTS,
+                ("v2f", vert * self.draw_scale + 100),
+                ("c3B", (int(values_norm[i] * 205) + 49, 0, 0)),
+            )
+
+    def _shift_parameter(self, mesh_gen: MeshGenerator, property: str, factor: float = 1.0):
+        mesh_gen.update_params(MapParameters(**{property: factor * self.step}))
+        print(f"Shifted {property} to {factor * self.step}")
