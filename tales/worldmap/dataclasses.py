@@ -20,7 +20,7 @@ class Adjacency:
 
 @dataclass(frozen=True)
 class MapParameters:
-    number_points: int = field(default=512, metadata={
+    number_points: int = field(default=1024, metadata={
         "description": "Higher numbers create bigger maps",
         "ranges": {
             (256, 1024): "Small sized map",
@@ -83,9 +83,17 @@ class MapParameters:
     number_rivers: int = field(default=30, metadata={
         "description": "Number of sources of rivers. Higher numbers create more river beginnings",
         "ranges": {
-            (0, 15): "Few rivers",
-            (15, 40): "Normal amount of rivers",
+            (0, 20): "Few rivers",
+            (20, 40): "Normal amount of rivers",
             (40, 80): "Lots of rivers"
+        }
+    })
+    river_length_minimum: int = field(default=4, metadata={
+        "description": "Minimum length that rivers must have before ending in the ocean or another river",
+        "ranges": {
+            (1, 2): "Short rivers are allowed",
+            (3, 4): "Medium length rivers are allowed",
+            (5, 15): "Only long river stretches are allowed"
         }
     })
     erosion_iterations: int = field(default=50, metadata={  # default of 50 is good, but too expensive while developing

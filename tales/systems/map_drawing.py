@@ -61,7 +61,7 @@ class MapDrawingSystem(System):
         self.draw_rivers(map.mesh_gen)
 
         # self._draw_attribute(map.mesh_gen, "flow")
-        self._shift_parameter(map.mesh_gen, "number_rivers", 2)
+        #self._shift_parameter(map.mesh_gen, "river_length_minimum", 1)
 
     def draw_map(self, mesh_gen: MeshGenerator):
         mesh = mesh_gen.mesh
