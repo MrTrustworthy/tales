@@ -20,7 +20,7 @@ class Adjacency:
 
 @dataclass(frozen=True)
 class MapParameters:
-    number_points: int = field(default=1024, metadata={
+    number_points: int = field(default=512, metadata={
         "description": "Higher numbers create bigger maps",
         "ranges": {
             (256, 1024): "Small sized map",
@@ -96,7 +96,7 @@ class MapParameters:
             (5, 15): "Only long river stretches are allowed"
         }
     })
-    erosion_iterations: int = field(default=50, metadata={  # default of 50 is good, but too expensive while developing
+    erosion_iterations: int = field(default=50, metadata={
         "description": "Higher numbers lead to a more line-y elevation pattern with deltas and mountain passes",
         "ranges": {
             (1, 30): "Low erosion impact, very little visible erosion lines",

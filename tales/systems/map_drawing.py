@@ -57,8 +57,8 @@ class MapDrawingSystem(System):
         map = entity.get_component_by_class(WorldMap)
         self.draw_map(map.mesh_gen)
         self.draw_centers(map.mesh_gen.mesh)
-        # self.draw_cities(map.mesh_gen)
         self.draw_rivers(map.mesh_gen)
+        self.draw_cities(map.mesh_gen)
 
         # self._draw_attribute(map.mesh_gen, "flow")
         #self._shift_parameter(map.mesh_gen, "river_length_minimum", 1)
@@ -78,7 +78,7 @@ class MapDrawingSystem(System):
             amount = len(drawable_poly) // 2
 
             # assemble colors based on the elevation of the vertices we draw
-            color_numbers = np.array([mesh.elevation[rvi] for rvi in vertice_indicies])
+            color_numbers = np.array([mesh_gen.elevator.elevation[rvi] for rvi in vertice_indicies])
             center_color_num = [mesh_gen.elevator.elevation_pts[i]]
 
             color_numbers = np.concatenate([center_color_num, color_numbers, [color_numbers[0]]])
@@ -100,15 +100,9 @@ class MapDrawingSystem(System):
             pyglet.graphics.vertex_list(
                 amount,
                 ("v2f/static", river_verts * self.draw_scale + 100),
-                ("c3B/static", (59, 179, 208) * amount),
+                ("c3B/static", (0, 0, 100) * amount),
             ).draw(pyglet.gl.GL_LINE_STRIP)
 
-            pyglet.gl.glPointSize(3)
-            pyglet.graphics.vertex_list(
-                1,
-                ("v2f", river_verts[:2] * self.draw_scale + 100),
-                ("c3B", (255, 0, 0)),
-            ).draw(pyglet.gl.GL_POINTS)
 
     def draw_cities(self, mesh_gen: MeshGenerator):
         if not self.cities:

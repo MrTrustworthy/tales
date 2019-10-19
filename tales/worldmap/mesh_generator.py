@@ -19,7 +19,6 @@ class MeshGenerator:
         self.mesh = Mesh(self.map_params)
         self.elevator = Elevator(self.mesh, self.map_params)
         self.elevator.generate_heightmap()
-        self.mesh.elevation = self.elevator.elevation
 
     def update_params(self, map_params: MapParameters):
         self.map_params = map_params

@@ -45,8 +45,6 @@ class Mesh:
 
         self.v_vertice_noise = self._vertice_noise(self.v_vertices)
 
-        self.elevation: Optional[ndarr] = None
-
     def _generate_points(self, iterations: int) -> ndarr:
         points = np.random.random((self.number_points, 2))
 
