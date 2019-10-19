@@ -40,7 +40,6 @@ class Elevator:
         regions = self.mesh.v_regions
         params = self.map_params
 
-
         # Outlines
         elevation = Elevator._create_baseline_elevation(vertice_noise, verts, num_verts)
         elevation = Elevator._create_hills(elevation, verts, params)
@@ -61,22 +60,20 @@ class Elevator:
             elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
             elevation[-1] = 0
 
-        # clean up coaslines
+        # clean up coastlines
         elevation = Elevator._raise_sealevel(elevation, params.percent_sea)
         elevation = Elevator._clean_coast(elevation, adj, num_verts, params)
 
+        # one last step of sink filling
+        elevation, downhill = Elevator._infill(elevation, downhill, adj, num_verts)
+
         # let's see about that
-        downhill = Elevator._calc_downhill(elevation, adj, num_verts)
         flow = Elevator._calc_flow(elevation, downhill, num_verts)
         elevation_pts = Elevator._calc_elevation_pts(num_points, regions, elevation)
 
         cities = Elevator._place_cities(params.number_cities, elevation, verts, flow, params)
-
         self.elevation, self.elevation_pts, self.base_erodability, self.cities, self.flow, self.downhill = \
             elevation, elevation_pts, base_erodability, cities, flow, downhill
-
-
-
 
     @staticmethod
     def _place_cities(
@@ -93,7 +90,6 @@ class Elevator:
                 cities.append(newcity)
             city_score -= params.city_spacing * 1 / (distance(verts, verts[newcity, :]) + 1e-9)
         return cities
-
 
     @staticmethod
     def _create_baseline_elevation(vertice_noise: ndarr, verts: ndarr, num_verts: int) -> ndarr:
@@ -248,7 +244,8 @@ class Elevator:
         return slope
 
     @staticmethod
-    def _erode_step(elevation: ndarr, base_erodability: ndarr, flow: ndarr, slopes: ndarr, erosion_rate: float) -> ndarr:
+    def _erode_step(elevation: ndarr, base_erodability: ndarr, flow: ndarr, slopes: ndarr,
+                    erosion_rate: float) -> ndarr:
         elevation = elevation.copy()
         river_rate = -flow ** 0.5 * slopes  # river erosion
         slope_rate = -slopes ** 2 * base_erodability  # slope smoothing
@@ -299,7 +296,7 @@ class Elevator:
     @staticmethod
     def _get_lowest_sill(elevation: ndarr, sinks: ndarr, adjacency: Adjacency) -> Tuple[float, int, int]:
 
-        height = 10000
+        height = 10000000
         maps = np.any((sinks[adjacency.adjacency_map] == -1) & adjacency.adjacency_map != -1, 1)
         edges = np.where((sinks != -1) & maps)[0]
 
@@ -314,7 +311,7 @@ class Elevator:
                     continue
                 height = newh
                 best_edge_corner = edge, neighbour
-        assert height < 10000 and best_edge_corner != (0, 0)
+        assert height < 10000000 and best_edge_corner != (0, 0)
         edge, neighbour = best_edge_corner
 
         return height, edge, neighbour

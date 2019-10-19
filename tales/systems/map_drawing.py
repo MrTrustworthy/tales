@@ -57,10 +57,10 @@ class MapDrawingSystem(System):
         map = entity.get_component_by_class(WorldMap)
         self.draw_map(map.mesh_gen)
         self.draw_centers(map.mesh_gen.mesh)
-        self.draw_cities(map.mesh_gen)
+        #self.draw_cities(map.mesh_gen)
         self.draw_rivers(map.mesh_gen)
 
-        #self._draw_attribute(map.mesh_gen, "flow")
+        # self._draw_attribute(map.mesh_gen, "flow")
 
         # factor = 1
         # property = "number_cities"
@@ -114,33 +114,27 @@ class MapDrawingSystem(System):
         num_rivers = 25
         rivers = []
 
-        already_river = lambda i: i in (r for ri in rivers for r in ri)
+        is_already_river = lambda i: i in (r for ri in rivers for r in ri)
+        is_below_water = lambda i: mesh_gen.mesh.elevation[i] <= 0
 
+        # create all rivers
         for start_idx in highest_flow_indicies:
             current = start_idx
 
-            if already_river(start_idx) or elev.elevation[start_idx] <= 0:
+            if is_already_river(start_idx) or elev.elevation[start_idx] <= 0:
                 continue
 
+            # create a single river
             river = [current]
             while True:
                 highest_neighbor = jget_neighbor_with_highest_flow(current, river)
-
                 # if there's no free neighbor, then stop there
                 if highest_neighbor in (None, -1):
-                    print("sink abort")
                     break
-
                 river.append(highest_neighbor)
-
                 # once river flows into the ocean, stop
-                if mesh_gen.mesh.elevation[highest_neighbor] <= 0:
-                    print("elev abort")
+                if is_below_water(highest_neighbor) or is_already_river(highest_neighbor):
                     break
-
-                if already_river(highest_neighbor):
-                    break
-
                 current = highest_neighbor
 
             rivers.append(river)
